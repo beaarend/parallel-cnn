@@ -150,3 +150,34 @@ float evaluate(
     }
     return (float)correct / images.size();
 }
+
+int predict(
+    Conv2D& conv,
+    ReLU& relu,
+    MaxPool2x2& pool,
+    FullyConnected& fc,
+    Softmax& softmax,
+    const std::vector<std::vector<float>>& image // <-- 2D
+) {
+
+    auto conv_out = conv.forward(image); 
+    std::vector<std::vector<std::vector<float>>> relu_out_volume(conv_out.size());
+    std::vector<std::vector<std::vector<float>>> pool_out_volume(conv_out.size());
+
+    for (size_t f = 0; f < conv_out.size(); f++) {
+        auto relu_out = relu.forward(conv_out[f]);
+        relu_out_volume[f] = relu_out;
+
+        auto pool_out = pool.forward(relu_out);
+        pool_out_volume[f] = pool_out;
+    }
+
+    auto flat_vector = flatten3D(pool_out_volume);
+    auto fc_out = fc.forward(flat_vector);
+    auto probabilities = softmax.forward(fc_out);
+
+    int prediction = std::distance(probabilities.begin(),
+                                   std::max_element(probabilities.begin(), probabilities.end()));
+
+    return prediction;
+}

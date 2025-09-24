@@ -32,4 +32,13 @@ float evaluate(
     const std::vector<int>& labels
 );
 
+int predict(
+    Conv2D& conv,
+    ReLU& relu,
+    MaxPool2x2& pool,
+    FullyConnected& fc,
+    Softmax& softmax,
+    const std::vector<std::vector<float>>& image 
+);
+
 #endif
