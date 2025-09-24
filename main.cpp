@@ -74,10 +74,8 @@ int main() {
     float lr = 0.01f;
 
     for (int e = 0; e < epochs; e++) {
-        // std::cout << "Epoch " << e+1 << "\n";
         train_epoch(conv1, relu1, pool1, fc1, softmax, train_images, train_labels, lr); 
         float acc = evaluate(conv1, relu1, pool1, fc1, softmax, test_images, test_labels); 
-        // std::cout << "Test Acc: " << acc << "\n";  
     }
 
     for (int i = 0; i < 10; i++) {
@@ -88,6 +86,18 @@ int main() {
                   << ", Predicted = " << pred_lbl
                   << (pred_lbl == true_lbl ? " ✅" : " ❌") << "\n";
     }
+
+    std::cout << "=== Timing ===\n";
+    std::cout << "Conv2D forward total: " << Conv2D::total_forward_time << " ms\n";
+    std::cout << "Conv2D backward total: " << Conv2D::total_backward_time << " ms\n";
+    std::cout << "ReLU forward total: " << ReLU::total_forward_time << " ms\n";
+    std::cout << "ReLU backward total: " << ReLU::total_backward_time << " ms\n";
+    std::cout << "MaxPool2x2 forward total: " << MaxPool2x2::total_forward_time << " ms\n";
+    std::cout << "MaxPool2x2 backward total: " << MaxPool2x2::total_backward_time << " ms\n";
+    std::cout << "FullyConnected forward total: " << FullyConnected::total_forward_time << " ms\n";
+    std::cout << "FullyConnected backward total: " << FullyConnected::total_backward_time << " ms\n";
+    std::cout << "Softmax forward total: " << Softmax::total_forward_time << " ms\n";
+    std::cout << "Softmax backward total: " << Softmax::total_backward_time << " ms\n";
 
     return 0;
 }

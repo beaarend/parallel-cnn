@@ -26,6 +26,10 @@ public:
     std::vector<std::vector<std::vector<float>>> grad_kernels; // gradientes acumulados
     std::vector<std::vector<float>> last_input; // input armazenado
 
+    static double total_forward_time;   
+    static double total_backward_time;
+    static double total_update_time;
+
     Conv2D(int input_dim, int kernel_size, int num_filters);
 
     std::string name() const override { return "Conv2D"; }
@@ -45,6 +49,9 @@ class ReLU : public Layer {
 public:
     std::vector<std::vector<float>> last_input;
 
+    static double total_forward_time;   
+    static double total_backward_time;
+
     std::string name() const override { return "ReLU"; }
     std::vector<std::vector<float>> forward(const std::vector<std::vector<float>>& input);
     std::vector<std::vector<float>> backward(const std::vector<std::vector<float>>& grad_output);
@@ -57,6 +64,9 @@ public:
     int input_dim;
     std::vector<std::vector<float>> last_input;
     std::vector<int> max_indices;
+
+    static double total_forward_time;   
+    static double total_backward_time;
 
     MaxPool2x2(int input_dim);
     std::string name() const override { return "MaxPool2x2"; }
@@ -78,6 +88,10 @@ public:
 
     std::vector<float> last_input;
 
+    static double total_forward_time;   
+    static double total_backward_time;
+    static double total_update_time;
+
     FullyConnected(int in_size, int out_size);
 
     std::string name() const override { return "FullyConnected"; }
@@ -91,6 +105,9 @@ public:
 class Softmax : public Layer {
 public:
     std::vector<float> last_output;
+
+    static double total_forward_time;   
+    static double total_backward_time;
 
     std::string name() const override { return "Softmax"; }
     std::vector<float> forward(const std::vector<float>& input);
