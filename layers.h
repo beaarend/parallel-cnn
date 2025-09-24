@@ -22,14 +22,20 @@ public:
 class Conv2D : public Layer {
 public:
     int input_dim, kernel_size, num_filters;
-    std::vector<std::vector<std::vector<float>>> kernels;
-    std::vector<std::vector<float>> last_input;
+    std::vector<std::vector<std::vector<float>>> kernels;     // [num_filters][kH][kW]
+    std::vector<std::vector<std::vector<float>>> grad_kernels; // gradientes acumulados
+    std::vector<std::vector<float>> last_input; // input armazenado
 
     Conv2D(int input_dim, int kernel_size, int num_filters);
 
     std::string name() const override { return "Conv2D"; }
-    std::vector<std::vector<float>> forward(const std::vector<std::vector<float>>& input);
-    std::vector<std::vector<float>> backward(const std::vector<std::vector<float>>& grad_output);
+
+    // forward: input 2D -> output 3D (num_filters mapas)
+    std::vector<std::vector<std::vector<float>>> forward(const std::vector<std::vector<float>>& input);
+
+    // backward: grad_output 3D (mesma forma da saída do forward)
+    std::vector<std::vector<float>> backward(const std::vector<std::vector<std::vector<float>>>& grad_output);
+
     void update(float lr) override;
     void debugPrint() const override;
 };

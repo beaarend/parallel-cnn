@@ -4,6 +4,8 @@
 #include <iostream>
 
 // =================== Conv2D ===================
+#include "layers.h"
+
 Conv2D::Conv2D(int input_dim, int kernel_size, int num_filters)
     : input_dim(input_dim), kernel_size(kernel_size), num_filters(num_filters) 
 {
@@ -11,38 +13,89 @@ Conv2D::Conv2D(int input_dim, int kernel_size, int num_filters)
     std::mt19937 gen(rd());
     std::uniform_real_distribution<float> dist(-0.1, 0.1);
 
-    kernels.resize(num_filters, std::vector<std::vector<float>>(kernel_size, std::vector<float>(kernel_size)));
-    for (int f = 0; f < num_filters; f++)
-        for (int i = 0; i < kernel_size; i++)
-            for (int j = 0; j < kernel_size; j++)
+    kernels.resize(num_filters);
+    grad_kernels.resize(num_filters);
+
+    for (int f = 0; f < num_filters; f++) {
+        kernels[f].resize(kernel_size, std::vector<float>(kernel_size));
+        grad_kernels[f].resize(kernel_size, std::vector<float>(kernel_size, 0.0f));
+
+        for (int i = 0; i < kernel_size; i++) {
+            for (int j = 0; j < kernel_size; j++) {
                 kernels[f][i][j] = dist(gen);
+            }
+        }
+    }
 }
 
-std::vector<std::vector<float>> Conv2D::forward(const std::vector<std::vector<float>>& input) {
+std::vector<std::vector<std::vector<float>>> Conv2D::forward(const std::vector<std::vector<float>>& input) {
     last_input = input;
-    // TODO: implementar convolução real
-    return input; // placeholder
+    int out_dim = input_dim - kernel_size + 1;
+    std::vector<std::vector<std::vector<float>>> output(
+        num_filters, std::vector<std::vector<float>>(out_dim, std::vector<float>(out_dim, 0.0f))
+    );
+
+    for (int f = 0; f < num_filters; f++) {
+        for (int i = 0; i < out_dim; i++) {
+            for (int j = 0; j < out_dim; j++) {
+                float sum = 0.0f;
+                for (int ki = 0; ki < kernel_size; ki++) {
+                    for (int kj = 0; kj < kernel_size; kj++) {
+                        sum += input[i + ki][j + kj] * kernels[f][ki][kj];
+                    }
+                }
+                output[f][i][j] = sum;
+            }
+        }
+    }
+    return output;
 }
 
-std::vector<std::vector<float>> Conv2D::backward(const std::vector<std::vector<float>>& grad_output) {
-    // TODO: implementar backward
-    return grad_output; // placeholder
+std::vector<std::vector<float>> Conv2D::backward(const std::vector<std::vector<std::vector<float>>>& grad_output) {
+    int out_dim = grad_output[0].size();
+    int in_dim = input_dim;
+
+    // gradiente no input
+    std::vector<std::vector<float>> grad_input(in_dim, std::vector<float>(in_dim, 0.0f));
+
+    // zera grad_kernels
+    for (int f = 0; f < num_filters; f++) {
+        for (int i = 0; i < kernel_size; i++) {
+            for (int j = 0; j < kernel_size; j++) {
+                grad_kernels[f][i][j] = 0.0f;
+            }
+        }
+    }
+
+    for (int f = 0; f < num_filters; f++) {
+        for (int i = 0; i < out_dim; i++) {
+            for (int j = 0; j < out_dim; j++) {
+                float go = grad_output[f][i][j];
+                for (int ki = 0; ki < kernel_size; ki++) {
+                    for (int kj = 0; kj < kernel_size; kj++) {
+                        grad_kernels[f][ki][kj] += last_input[i + ki][j + kj] * go;
+                        grad_input[i + ki][j + kj] += kernels[f][ki][kj] * go;
+                    }
+                }
+            }
+        }
+    }
+
+    return grad_input;
 }
 
 void Conv2D::update(float lr) {
-    // TODO: atualizar kernels
+    for (int f = 0; f < num_filters; f++) {
+        for (int i = 0; i < kernel_size; i++) {
+            for (int j = 0; j < kernel_size; j++) {
+                kernels[f][i][j] -= lr * grad_kernels[f][i][j];
+            }
+        }
+    }
 }
 
 void Conv2D::debugPrint() const {
-    std::cout << name() << " kernels:\n";
-    for (int f = 0; f < num_filters; f++) {
-        std::cout << "Filter " << f << ":\n";
-        for (auto& row : kernels[f]) {
-            for (auto& v : row) std::cout << std::fixed << std::setprecision(3) << v << " ";
-            std::cout << "\n";
-        }
-        std::cout << "\n";
-    }
+    std::cout << "Conv2D with " << num_filters << " filters (" << kernel_size << "x" << kernel_size << ")\n";
 }
 
 // =================== ReLU ===================

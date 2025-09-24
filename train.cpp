@@ -32,6 +32,34 @@ std::vector<std::vector<float>> flatten_backward(const std::vector<float>& grad1
     return grad2D;
 }
 
+// flatten volume 3D -> 1D
+std::vector<float> flatten3D(const std::vector<std::vector<std::vector<float>>>& input) {
+    std::vector<float> flat;
+    for (const auto& mat : input) {
+        for (const auto& row : mat) {
+            flat.insert(flat.end(), row.begin(), row.end());
+        }
+    }
+    return flat;
+}
+
+// backward: reconstrói 3D a partir do grad 1D
+std::vector<std::vector<std::vector<float>>> flatten3D_backward(
+    const std::vector<float>& grad, 
+    const std::vector<std::vector<std::vector<float>>>& ref
+) {
+    std::vector<std::vector<std::vector<float>>> output = ref;
+    size_t idx = 0;
+    for (auto& mat : output) {
+        for (auto& row : mat) {
+            for (auto& val : row) {
+                val = grad[idx++];
+            }
+        }
+    }
+    return output;
+}
+
 // ======================== train ========================
 void train_epoch(
     Conv2D& conv,
@@ -47,11 +75,14 @@ void train_epoch(
 
     for (size_t n = 0; n < images.size(); n++) {
         // forward
-        auto out1 = conv.forward(images[n]);        // 2D
-        auto out2 = relu.forward(out1);            // 2D
-        auto flat = flatten(out2);                 // 1D
-        auto out3 = fc.forward(flat);              // 1D
-        auto out4 = softmax.forward(out3);         // 1D
+        auto out1 = conv.forward(images[n]);              // 3D
+        std::vector<std::vector<std::vector<float>>> out2(out1.size());
+        for (size_t f = 0; f < out1.size(); f++)
+            out2[f] = relu.forward(out1[f]);             // ReLU por filtro (2D)
+
+        auto flat = flatten3D(out2);                     // flatten 3D -> 1D
+        auto out3 = fc.forward(flat);                    // 1D
+        auto out4 = softmax.forward(out3);               // 1D
 
         // loss
         total_loss += cross_entropy_loss(out4, labels[n]);
@@ -59,20 +90,24 @@ void train_epoch(
         if (pred == labels[n]) correct++;
 
         // backward
-        auto grad = cross_entropy_grad(out4, labels[n]);  // 1D
-        grad = softmax.backward(grad);                    // 1D
-        softmax.update(lr);
-        grad = fc.backward(grad);                         // 1D
+        auto grad = cross_entropy_grad(out4, labels[n]); // 1D
+        grad = softmax.backward(grad);                   // 1D
+        grad = fc.backward(grad);                        // 1D
         fc.update(lr);
-        auto grad2D = flatten_backward(grad, out2);      // 2D
-        grad2D = relu.backward(grad2D);                  // 2D
-        grad2D = conv.backward(grad2D);                  // 2D
+
+        auto grad3D = flatten3D_backward(grad, out2);    // 1D -> 3D
+        std::vector<std::vector<std::vector<float>>> grad_relu(out2.size());
+        for (size_t f = 0; f < out2.size(); f++)
+            grad_relu[f] = relu.backward(grad3D[f]);     // 2D por filtro
+
+        auto grad_input = conv.backward(grad_relu);      // 2D
         conv.update(lr);
     }
 
     std::cout << "Train Loss: " << total_loss / images.size()
               << " | Acc: " << (float)correct / images.size() << "\n";
 }
+
 
 // ======================== eval ========================
 float evaluate(
