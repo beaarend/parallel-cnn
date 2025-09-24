@@ -64,6 +64,7 @@ std::vector<std::vector<std::vector<float>>> flatten3D_backward(
 void train_epoch(
     Conv2D& conv,
     ReLU& relu,
+    MaxPool2x2& pool,
     FullyConnected& fc,
     Softmax& softmax,
     const std::vector<std::vector<std::vector<float>>>& images,
@@ -75,14 +76,19 @@ void train_epoch(
 
     for (size_t n = 0; n < images.size(); n++) {
         // forward
-        auto out1 = conv.forward(images[n]);              // 3D
+        auto out1 = conv.forward(images[n]);              // 3D (num_filters × H × W)
         std::vector<std::vector<std::vector<float>>> out2(out1.size());
-        for (size_t f = 0; f < out1.size(); f++)
-            out2[f] = relu.forward(out1[f]);             // ReLU por filtro (2D)
+        std::vector<std::vector<std::vector<float>>> out_pool(out1.size());
 
-        auto flat = flatten3D(out2);                     // flatten 3D -> 1D
-        auto out3 = fc.forward(flat);                    // 1D
-        auto out4 = softmax.forward(out3);               // 1D
+        for (size_t f = 0; f < out1.size(); f++) {
+            auto relu_out = relu.forward(out1[f]);        // ReLU por filtro (2D)
+            out2[f] = relu_out;
+            out_pool[f] = pool.forward(relu_out);         // Pool por filtro (2D)
+        }
+
+        auto flat = flatten3D(out_pool);                  // flatten 3D -> 1D
+        auto out3 = fc.forward(flat);                     // 1D
+        auto out4 = softmax.forward(out3);                // 1D
 
         // loss
         total_loss += cross_entropy_loss(out4, labels[n]);
@@ -90,17 +96,20 @@ void train_epoch(
         if (pred == labels[n]) correct++;
 
         // backward
-        auto grad = cross_entropy_grad(out4, labels[n]); // 1D
-        grad = softmax.backward(grad);                   // 1D
-        grad = fc.backward(grad);                        // 1D
+        auto grad = cross_entropy_grad(out4, labels[n]);  // 1D
+        grad = softmax.backward(grad);                    // 1D
+        grad = fc.backward(grad);                         // 1D
         fc.update(lr);
 
-        auto grad3D = flatten3D_backward(grad, out2);    // 1D -> 3D
-        std::vector<std::vector<std::vector<float>>> grad_relu(out2.size());
-        for (size_t f = 0; f < out2.size(); f++)
-            grad_relu[f] = relu.backward(grad3D[f]);     // 2D por filtro
+        auto grad3D = flatten3D_backward(grad, out_pool); // 1D -> 3D (forma de out_pool)
 
-        auto grad_input = conv.backward(grad_relu);      // 2D
+        std::vector<std::vector<std::vector<float>>> grad_relu(out1.size());
+        for (size_t f = 0; f < out1.size(); f++) {
+            auto grad_pool = pool.backward(grad3D[f]);    // unpool grad
+            grad_relu[f] = relu.backward(grad_pool);      // ReLU backward
+        }
+
+        auto grad_input = conv.backward(grad_relu);       // 2D grad
         conv.update(lr);
     }
 
@@ -113,6 +122,7 @@ void train_epoch(
 float evaluate(
     Conv2D& conv,
     ReLU& relu,
+    MaxPool2x2& pool,
     FullyConnected& fc,
     Softmax& softmax,
     const std::vector<std::vector<std::vector<float>>>& images,
@@ -120,11 +130,20 @@ float evaluate(
 ){
     int correct = 0;
     for (size_t n = 0; n < images.size(); n++) {
-        auto out1 = conv.forward(images[n]);        // 2D
-        auto out2 = relu.forward(out1);            // 2D
-        auto flat = flatten(out2);                 // 1D
-        auto out3 = fc.forward(flat);              // 1D
-        auto out4 = softmax.forward(out3);         // 1D
+        auto out1 = conv.forward(images[n]); // 3D
+
+        std::vector<std::vector<std::vector<float>>> out2(out1.size());
+        std::vector<std::vector<std::vector<float>>> out_pool(out1.size());
+
+        for (size_t f = 0; f < out1.size(); f++) {
+            auto relu_out = relu.forward(out1[f]);
+            out2[f] = relu_out;
+            out_pool[f] = pool.forward(relu_out);         // aplica pooling
+        }
+
+        auto flat = flatten3D(out_pool);     // 3D -> 1D
+        auto out3 = fc.forward(flat);        // 1D
+        auto out4 = softmax.forward(out3);   // 1D
 
         int pred = std::distance(out4.begin(), std::max_element(out4.begin(), out4.end()));
         if (pred == labels[n]) correct++;

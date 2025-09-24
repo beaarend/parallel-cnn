@@ -129,19 +129,55 @@ MaxPool2x2::MaxPool2x2(int input_dim) : input_dim(input_dim) {}
 
 std::vector<std::vector<float>> MaxPool2x2::forward(const std::vector<std::vector<float>>& input) {
     last_input = input;
-    // TODO: implementar pooling real
-    return input; // placeholder
+    int out_dim = input_dim / 2;
+    std::vector<std::vector<float>> output(out_dim, std::vector<float>(out_dim));
+
+    max_indices.clear();
+    max_indices.reserve(out_dim * out_dim);
+
+    for (int i = 0; i < out_dim; i++) {
+        for (int j = 0; j < out_dim; j++) {
+            float max_val = -1e9;
+            int max_idx = -1;
+
+            // percorre janela 2x2
+            for (int di = 0; di < 2; di++) {
+                for (int dj = 0; dj < 2; dj++) {
+                    int r = i * 2 + di;
+                    int c = j * 2 + dj;
+                    if (input[r][c] > max_val) {
+                        max_val = input[r][c];
+                        max_idx = r * input_dim + c; // index linearizado
+                    }
+                }
+            }
+            output[i][j] = max_val;
+            max_indices.push_back(max_idx);
+        }
+    }
+    return output;
 }
 
 std::vector<std::vector<float>> MaxPool2x2::backward(const std::vector<std::vector<float>>& grad_output) {
-    // TODO: implementar backward
-    return grad_output; // placeholder
+    int out_dim = grad_output.size();
+    std::vector<std::vector<float>> grad_input(input_dim, std::vector<float>(input_dim, 0.0f));
+
+    for (int i = 0; i < out_dim; i++) {
+        for (int j = 0; j < out_dim; j++) {
+            int idx = i * out_dim + j;
+            int max_idx = max_indices[idx];
+            int r = max_idx / input_dim;
+            int c = max_idx % input_dim;
+            grad_input[r][c] = grad_output[i][j];
+        }
+    }
+    return grad_input;
 }
 
 void MaxPool2x2::debugPrint() const {
     std::cout << name() << " last_input:\n";
     for (auto& row : last_input) {
-        for (auto& v : row) std::cout << v << " ";
+        for (auto& v : row) std::cout << std::setw(6) << v << " ";
         std::cout << "\n";
     }
 }
@@ -156,6 +192,9 @@ FullyConnected::FullyConnected(int in_size, int out_size)
 
     weights.resize(out_size, std::vector<float>(in_size));
     bias.resize(out_size);
+    grad_weights.resize(out_size, std::vector<float>(in_size, 0.0f));
+    grad_bias.resize(out_size, 0.0f);
+
     for (int i = 0; i < out_size; i++) {
         bias[i] = dist(gen);
         for (int j = 0; j < in_size; j++)
@@ -166,38 +205,58 @@ FullyConnected::FullyConnected(int in_size, int out_size)
 std::vector<float> FullyConnected::forward(const std::vector<float>& input) {
     last_input = input;
     std::vector<float> out(out_size, 0.0f);
+
     for (int i = 0; i < out_size; i++) {
-        for (int j = 0; j < in_size; j++)
+        for (int j = 0; j < in_size; j++) {
             out[i] += weights[i][j] * input[j];
+        }
         out[i] += bias[i];
     }
+
     return out;
 }
 
 std::vector<float> FullyConnected::backward(const std::vector<float>& grad_output) {
+    // grad w.r.t input
     std::vector<float> grad_input(in_size, 0.0f);
-    for (int i = 0; i < out_size; i++)
+
+    // reset grad accumulators
+    for (int i = 0; i < out_size; i++) {
+        grad_bias[i] = 0.0f;
         for (int j = 0; j < in_size; j++)
-            grad_input[j] += weights[i][j] * grad_output[i];
+            grad_weights[i][j] = 0.0f;
+    }
+
+    // compute gradients
+    for (int i = 0; i < out_size; i++) {
+        grad_bias[i] += grad_output[i];   // dL/db = grad_output
+        for (int j = 0; j < in_size; j++) {
+            grad_weights[i][j] += last_input[j] * grad_output[i]; // dL/dW
+            grad_input[j] += weights[i][j] * grad_output[i];      // dL/dInput
+        }
+    }
+
     return grad_input;
 }
 
 void FullyConnected::update(float lr) {
     for (int i = 0; i < out_size; i++) {
-        for (int j = 0; j < in_size; j++)
-            weights[i][j] -= lr * last_input[j]; // placeholder, precisa gradiente real
-        bias[i] -= lr; // placeholder
+        for (int j = 0; j < in_size; j++) {
+            weights[i][j] -= lr * grad_weights[i][j];
+        }
+        bias[i] -= lr * grad_bias[i];
     }
 }
 
 void FullyConnected::debugPrint() const {
     std::cout << name() << " weights:\n";
-    for (auto& row : weights) {
-        for (auto& v : row) std::cout << v << " ";
-        std::cout << "\n";
+    for (int i = 0; i < std::min(out_size, 3); i++) {
+        for (int j = 0; j < std::min(in_size, 5); j++) {
+            std::cout << std::fixed << std::setprecision(4) << weights[i][j] << " ";
+        }
+        std::cout << "... bias=" << bias[i] << "\n";
     }
 }
-
 // =================== Softmax ===================
 std::vector<float> Softmax::forward(const std::vector<float>& input) {
     last_output = input;

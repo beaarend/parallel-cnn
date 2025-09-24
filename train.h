@@ -14,6 +14,7 @@ std::vector<std::vector<float>> flatten_backward(const std::vector<float>& grad1
 void train_epoch(
     Conv2D& conv,
     ReLU& relu,
+    MaxPool2x2& pool,
     FullyConnected& fc,
     Softmax& softmax,
     const std::vector<std::vector<std::vector<float>>>& images, // [N][28][28]
@@ -24,6 +25,7 @@ void train_epoch(
 float evaluate(
     Conv2D& conv,
     ReLU& relu,
+    MaxPool2x2& pool,
     FullyConnected& fc,
     Softmax& softmax,
     const std::vector<std::vector<std::vector<float>>>& images,

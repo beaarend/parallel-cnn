@@ -71,6 +71,11 @@ public:
     int in_size, out_size;
     std::vector<std::vector<float>> weights;
     std::vector<float> bias;
+
+    // gradientes
+    std::vector<std::vector<float>> grad_weights;
+    std::vector<float> grad_bias;
+
     std::vector<float> last_input;
 
     FullyConnected(int in_size, int out_size);

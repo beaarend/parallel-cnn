@@ -55,9 +55,12 @@ void load_mnist_csv(const std::string& file_path,
 }
 
 int main() {
-    Conv2D conv1(1, 3, 1);         // 1 canal, 1 filtro, 3x3
+    // Conv2D conv1(1, 3, 1);         // 1 canal, 1 filtro, 3x3
+    Conv2D conv1(28, 3, 1);   // entrada 28x28, kernel 3x3, 1 filtro
     ReLU relu1;
-    FullyConnected fc1(26*26, 10);    // saída 10 classes
+    // FullyConnected fc1(26*26, 10);    // saída 10 classes
+    FullyConnected fc1(13 * 13 * 1, 10);
+    MaxPool2x2 pool1(26);
     Softmax softmax;
 
     std::vector<std::vector<std::vector<float>>> train_images;
@@ -74,8 +77,8 @@ int main() {
 
     for (int e = 0; e < epochs; e++) {
         std::cout << "Epoch " << e+1 << "\n";
-        train_epoch(conv1, relu1, fc1, softmax, train_images, train_labels, lr);
-        float acc = evaluate(conv1, relu1, fc1, softmax, test_images, test_labels);
-        // std::cout << "Test Acc: " << acc << "\n";
+        train_epoch(conv1, relu1, pool1, fc1, softmax, train_images, train_labels, lr); 
+        float acc = evaluate(conv1, relu1, pool1, fc1, softmax, test_images, test_labels); 
+        std::cout << "Test Acc: " << acc << "\n";  
     }
 }
