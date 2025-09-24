@@ -6,7 +6,7 @@
 #include <vector>
 #include <iostream>
 
-void load_mnist_csv(const std::string& file_path,
+void load_dataset_csv(const std::string& file_path,
                     std::vector<std::vector<std::vector<float>>>& images,
                     std::vector<int>& labels,
                     int num_samples = -1) 
@@ -18,7 +18,7 @@ void load_mnist_csv(const std::string& file_path,
     images.clear();
     labels.clear();
 
-    std::cout << "Loading MNIST data from " << file_path << "...\n";
+    std::cout << "Loading dataset data from " << file_path << "...\n";
 
     std::string line;
     int count = 0;
@@ -63,11 +63,11 @@ int main() {
 
     std::vector<std::vector<std::vector<float>>> train_images;
     std::vector<int> train_labels;
-    load_mnist_csv("dataset/mnist_train.csv", train_images, train_labels, 1000);
+    load_dataset_csv("dataset/mnist_train.csv", train_images, train_labels, 10000);
 
     std::vector<std::vector<std::vector<float>>> test_images;
     std::vector<int> test_labels;
-    load_mnist_csv("dataset/mnist_test.csv", test_images, test_labels, 200);
+    load_dataset_csv("dataset/mnist_test.csv", test_images, test_labels, 2000);
 
     // Treino
     int epochs = 100;
