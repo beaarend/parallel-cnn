@@ -55,9 +55,10 @@ void load_dataset_csv(const std::string& file_path,
 }
 
 int main() {
-    Conv2D conv1(28, 3, 1);   // entrada 28x28, kernel 3x3, 1 filtro
-    MaxPool2x2 pool1(26); // entrada 26x26 (após conv 3x3)
-    FullyConnected fc1(13 * 13 * 1, 10); // saida 10 classes
+    Conv2D conv1(28, 5, 1);   // entrada 28x28, kernel 5x5, 1 filtro
+    // 28x28 - kernel_size + 1 = 24x24
+    MaxPool2x2 pool1(24); // entrada 24x24 (após conv 5x5)
+    FullyConnected fc1(12 * 12 * 1, 10); // saida 10 classes
     ReLU relu1;
     Softmax softmax;
 

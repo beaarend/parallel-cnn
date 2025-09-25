@@ -42,6 +42,8 @@ std::vector<std::vector<std::vector<float>>> Conv2D::forward(const std::vector<s
         num_filters, std::vector<std::vector<float>>(out_dim, std::vector<float>(out_dim, 0.0f))
     );
 
+    // 28x28
+
     for (int f = 0; f < num_filters; f++) {
         for (int i = 0; i < out_dim; i++) {
             for (int j = 0; j < out_dim; j++) {
