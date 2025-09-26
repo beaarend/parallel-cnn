@@ -64,11 +64,11 @@ int main() {
 
     std::vector<std::vector<std::vector<float>>> train_images;
     std::vector<int> train_labels;
-    load_dataset_csv("dataset/mnist_train.csv", train_images, train_labels, 10000);
+    load_dataset_csv("dataset/mnist_train.csv", train_images, train_labels, 30000);
 
     std::vector<std::vector<std::vector<float>>> test_images;
     std::vector<int> test_labels;
-    load_dataset_csv("dataset/mnist_test.csv", test_images, test_labels, 2000);
+    load_dataset_csv("dataset/mnist_test.csv", test_images, test_labels, 6000);
 
     // Treino
     int epochs = 100;

@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -O2 -Wall
+CXXFLAGS = -std=c++17 -O2 -Wall -fopenmp
 
 SRC = main.cpp layers.cpp train.cpp
 OBJ = $(SRC:.cpp=.o)

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <chrono>
+#include <omp.h>
 
 // =================== Conv2D ===================
 
@@ -42,8 +43,8 @@ std::vector<std::vector<std::vector<float>>> Conv2D::forward(const std::vector<s
         num_filters, std::vector<std::vector<float>>(out_dim, std::vector<float>(out_dim, 0.0f))
     );
 
-    // 28x28
-
+    // parallelize over filters and output positions
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int f = 0; f < num_filters; f++) {
         for (int i = 0; i < out_dim; i++) {
             for (int j = 0; j < out_dim; j++) {
@@ -181,6 +182,8 @@ std::vector<std::vector<float>> MaxPool2x2::forward(const std::vector<std::vecto
     max_indices.clear();
     max_indices.reserve(out_dim * out_dim);
 
+    // parallelize outer loops; each output cell independent
+    #pragma omp parallel for collapse(2) schedule(static)
     for (int i = 0; i < out_dim; i++) {
         for (int j = 0; j < out_dim; j++) {
             float max_val = -1e9;
@@ -215,6 +218,8 @@ std::vector<std::vector<float>> MaxPool2x2::backward(const std::vector<std::vect
     int out_dim = grad_output.size();
     std::vector<std::vector<float>> grad_input(input_dim, std::vector<float>(input_dim, 0.0f));
 
+    // each output contributes to a single input index -> independent writes
+    #pragma omp parallel for collapse(2) schedule(static)
     for (int i = 0; i < out_dim; i++) {
         for (int j = 0; j < out_dim; j++) {
             int idx = i * out_dim + j;
@@ -270,6 +275,7 @@ std::vector<float> FullyConnected::forward(const std::vector<float>& input) {
     last_input = input;
     std::vector<float> out(out_size, 0.0f);
 
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < out_size; i++) {
         for (int j = 0; j < in_size; j++) {
             out[i] += weights[i][j] * input[j];
