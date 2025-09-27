@@ -72,7 +72,7 @@ int main() {
 
     // Treino
     int epochs = 100;
-    float lr = 0.01f;
+    float lr = 0.5f;
 
     for (int e = 0; e < epochs; e++) {
         train_epoch(conv1, relu1, pool1, fc1, softmax, train_images, train_labels, lr); 

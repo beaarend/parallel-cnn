@@ -26,6 +26,17 @@ public:
     std::vector<std::vector<std::vector<float>>> grad_kernels; // gradientes acumulados
     std::vector<std::vector<float>> last_input; // input armazenado
 
+    std::vector<std::vector<std::vector<float>>> forward_nostate(
+        const std::vector<std::vector<float>>& input,
+        std::vector<std::vector<float>>& out_last_input
+    );
+
+    std::vector<std::vector<float>> backward_nostate(
+        const std::vector<std::vector<std::vector<float>>>& grad_output,
+        const std::vector<std::vector<float>>& last_input_extern,
+        std::vector<std::vector<std::vector<float>>>& out_grad_kernels
+    );
+
     static double total_forward_time;   
     static double total_backward_time;
     static double total_update_time;
@@ -52,6 +63,15 @@ public:
     static double total_forward_time;   
     static double total_backward_time;
 
+    std::vector<std::vector<float>> forward_nostate_relu(
+        const std::vector<std::vector<float>>& input,
+        std::vector<std::vector<float>>& out_last_input
+    );
+    std::vector<std::vector<float>> backward_nostate(
+        const std::vector<std::vector<float>>& grad_output,
+        const std::vector<std::vector<float>>& last_input_extern
+    );
+
     std::string name() const override { return "ReLU"; }
     std::vector<std::vector<float>> forward(const std::vector<std::vector<float>>& input);
     std::vector<std::vector<float>> backward(const std::vector<std::vector<float>>& grad_output);
@@ -67,6 +87,15 @@ public:
 
     static double total_forward_time;   
     static double total_backward_time;
+
+    std::vector<std::vector<float>> forward_nostate(
+        const std::vector<std::vector<float>>& input,
+        std::vector<int>& out_max_indices
+    );
+    std::vector<std::vector<float>> backward_nostate(
+        const std::vector<std::vector<float>>& grad_output,
+        const std::vector<int>& max_indices_extern
+    );
 
     MaxPool2x2(int input_dim);
     std::string name() const override { return "MaxPool2x2"; }
@@ -87,6 +116,19 @@ public:
     std::vector<float> grad_bias;
 
     std::vector<float> last_input;
+
+    std::vector<float> forward_nostate(
+        const std::vector<float>& input,
+        std::vector<float>& out_last_input
+    );
+
+    // backward that fills provided gradients (doesn't touch internal grad storage)
+    std::vector<float> backward_nostate(
+        const std::vector<float>& grad_output,
+        const std::vector<float>& last_input_extern,
+        std::vector<std::vector<float>>& out_grad_weights,
+        std::vector<float>& out_grad_bias
+    );
 
     static double total_forward_time;   
     static double total_backward_time;
@@ -109,10 +151,35 @@ public:
     static double total_forward_time;   
     static double total_backward_time;
 
+       std::vector<float> forward_nostate(const std::vector<float>& input, std::vector<float>& out_last_output);
+    std::vector<float> backward_nostate(const std::vector<float>& grad_output, const std::vector<float>& last_output_extern);
+
+
     std::string name() const override { return "Softmax"; }
     std::vector<float> forward(const std::vector<float>& input);
     std::vector<float> backward(const std::vector<float>& grad_output);
     void debugPrint() const override;
 };
+
+// in Conv2D (layers.h)
+    // thread-safe forward that writes last_input externally
+    
+
+    // thread-safe backward that DOES NOT modify internal grad_kernels:
+    // fills out_grad_kernels (shape [num_filters][kH][kW]) and returns grad_input
+    
+
+// in ReLU (layers.h)
+    
+
+// in MaxPool2x2 (layers.h)
+    
+
+// in FullyConnected (layers.h)
+    
+
+// in Softmax (layers.h)
+// softmax.forward/backward are cheap; we can use them as-is but to be consistent:
+ 
 
 #endif

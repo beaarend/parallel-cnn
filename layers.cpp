@@ -43,7 +43,7 @@ std::vector<std::vector<std::vector<float>>> Conv2D::forward(const std::vector<s
     );
 
     // 28x28
-
+    
     for (int f = 0; f < num_filters; f++) {
         for (int i = 0; i < out_dim; i++) {
             for (int j = 0; j < out_dim; j++) {
@@ -132,6 +132,7 @@ std::vector<std::vector<float>> ReLU::forward(const std::vector<std::vector<floa
 
     last_input = input;
     std::vector<std::vector<float>> out = input;
+    # pragma omp parallel for schedule(dynamic,4)
     for (auto& row : out)
         for (auto& v : row)
             v = std::max(0.0f, v);
@@ -147,6 +148,7 @@ std::vector<std::vector<float>> ReLU::backward(const std::vector<std::vector<flo
     auto start = std::chrono::high_resolution_clock::now();
 
     std::vector<std::vector<float>> grad = grad_output;
+    # pragma omp parallel for schedule(dynamic,4)
     for (size_t i = 0; i < grad.size(); i++)
         for (size_t j = 0; j < grad[i].size(); j++)
             grad[i][j] *= (last_input[i][j] > 0 ? 1.0f : 0.0f);
@@ -180,7 +182,7 @@ std::vector<std::vector<float>> MaxPool2x2::forward(const std::vector<std::vecto
 
     max_indices.clear();
     max_indices.reserve(out_dim * out_dim);
-
+    # pragma omp parallel for schedule(dynamic,4)
     for (int i = 0; i < out_dim; i++) {
         for (int j = 0; j < out_dim; j++) {
             float max_val = -1e9;
@@ -214,7 +216,7 @@ std::vector<std::vector<float>> MaxPool2x2::backward(const std::vector<std::vect
 
     int out_dim = grad_output.size();
     std::vector<std::vector<float>> grad_input(input_dim, std::vector<float>(input_dim, 0.0f));
-
+    # pragma omp parallel for schedule(dynamic,4)
     for (int i = 0; i < out_dim; i++) {
         for (int j = 0; j < out_dim; j++) {
             int idx = i * out_dim + j;
@@ -364,4 +366,204 @@ void Softmax::debugPrint() const {
     std::cout << "Softmax output n precisa dessa merda mas a virtual layer n deixa tirar af: ";
     for (float x : last_output) std::cout << x << " ";
     std::cout << "\n";
+}
+
+// thread-safe forward
+std::vector<std::vector<std::vector<float>>> Conv2D::forward_nostate(
+    const std::vector<std::vector<float>>& input,
+    std::vector<std::vector<float>>& out_last_input
+) {
+    // copy input into out_last_input (per-sample storage)
+    out_last_input = input;
+
+    int out_dim = input_dim - kernel_size + 1;
+    std::vector<std::vector<std::vector<float>>> output(
+        num_filters, std::vector<std::vector<float>>(out_dim, std::vector<float>(out_dim, 0.0f))
+    );
+
+    // Parallelize across filters and output positions if beneficial
+    #pragma omp parallel for collapse(3) schedule(static)
+    for (int f = 0; f < num_filters; f++) {
+        for (int i = 0; i < out_dim; i++) {
+            for (int j = 0; j < out_dim; j++) {
+                float sum = 0.0f;
+                for (int ki = 0; ki < kernel_size; ki++) {
+                    for (int kj = 0; kj < kernel_size; kj++) {
+                        sum += input[i + ki][j + kj] * kernels[f][ki][kj];
+                    }
+                }
+                output[f][i][j] = sum;
+            }
+        }
+    }
+    return output;
+}
+
+// thread-safe backward that COMPUTES grad_input and fills out_grad_kernels (does NOT modify this->grad_kernels)
+std::vector<std::vector<float>> Conv2D::backward_nostate(
+    const std::vector<std::vector<std::vector<float>>>& grad_output,
+    const std::vector<std::vector<float>>& last_input_extern,
+    std::vector<std::vector<std::vector<float>>>& out_grad_kernels
+) {
+    int out_dim = grad_output[0].size();
+    int in_dim = input_dim;
+
+    // prepare out_grad_kernels
+    out_grad_kernels.assign(num_filters, std::vector<std::vector<float>>(kernel_size, std::vector<float>(kernel_size, 0.0f)));
+
+    std::vector<std::vector<float>> grad_input(in_dim, std::vector<float>(in_dim, 0.0f));
+
+    for (int f = 0; f < num_filters; f++) {
+        for (int i = 0; i < out_dim; i++) {
+            for (int j = 0; j < out_dim; j++) {
+                float go = grad_output[f][i][j];
+                for (int ki = 0; ki < kernel_size; ki++) {
+                    for (int kj = 0; kj < kernel_size; kj++) {
+                        out_grad_kernels[f][ki][kj] += last_input_extern[i + ki][j + kj] * go;
+                        grad_input[i + ki][j + kj] += kernels[f][ki][kj] * go;
+                    }
+                }
+            }
+        }
+    }
+    return grad_input;
+}
+
+
+std::vector<std::vector<float>> ReLU::forward_nostate_relu(
+    const std::vector<std::vector<float>>& input,
+    std::vector<std::vector<float>>& out_last_input
+) {
+    out_last_input = input;
+    std::vector<std::vector<float>> out = input;
+    for (auto& row : out)
+        for (auto& v : row)
+            v = std::max(0.0f, v);
+    return out;
+}
+
+std::vector<std::vector<float>> ReLU::backward_nostate(
+    const std::vector<std::vector<float>>& grad_output,
+    const std::vector<std::vector<float>>& last_input_extern
+) {
+    std::vector<std::vector<float>> grad = grad_output;
+    for (size_t i = 0; i < grad.size(); i++)
+        for (size_t j = 0; j < grad[i].size(); j++)
+            grad[i][j] *= (last_input_extern[i][j] > 0 ? 1.0f : 0.0f);
+    return grad;
+}
+
+
+std::vector<std::vector<float>> MaxPool2x2::forward_nostate(
+    const std::vector<std::vector<float>>& input,
+    std::vector<int>& out_max_indices
+) {
+    int out_dim = input_dim / 2;
+    std::vector<std::vector<float>> output(out_dim, std::vector<float>(out_dim));
+    out_max_indices.clear();
+    out_max_indices.resize(out_dim * out_dim);
+
+    for (int i = 0; i < out_dim; i++) {
+        for (int j = 0; j < out_dim; j++) {
+            float max_val = -1e9f;
+            int max_idx = -1;
+            for (int di = 0; di < 2; di++) {
+                for (int dj = 0; dj < 2; dj++) {
+                    int r = i * 2 + di;
+                    int c = j * 2 + dj;
+                    if (input[r][c] > max_val) {
+                        max_val = input[r][c];
+                        max_idx = r * input_dim + c;
+                    }
+                }
+            }
+            output[i][j] = max_val;
+            int idx = i * out_dim + j;
+            out_max_indices[idx] = max_idx;
+        }
+    }
+    return output;
+}
+
+std::vector<std::vector<float>> MaxPool2x2::backward_nostate(
+    const std::vector<std::vector<float>>& grad_output,
+    const std::vector<int>& max_indices_extern
+) {
+    int out_dim = grad_output.size();
+    std::vector<std::vector<float>> grad_input(input_dim, std::vector<float>(input_dim, 0.0f));
+    for (int i = 0; i < out_dim; i++) {
+        for (int j = 0; j < out_dim; j++) {
+            int idx = i * out_dim + j;
+            int max_idx = max_indices_extern[idx];
+            int r = max_idx / input_dim;
+            int c = max_idx % input_dim;
+            grad_input[r][c] = grad_output[i][j];
+        }
+    }
+    return grad_input;
+}
+
+
+std::vector<float> FullyConnected::forward_nostate(
+    const std::vector<float>& input,
+    std::vector<float>& out_last_input
+) {
+    out_last_input = input;
+    std::vector<float> out(out_size, 0.0f);
+
+    // choose whether to parallelize depending on size
+    if (out_size > 256) {
+        #pragma omp parallel for schedule(static)
+        for (int i = 0; i < out_size; i++) {
+            float s = 0.0f;
+            for (int j = 0; j < in_size; j++) s += weights[i][j] * input[j];
+            out[i] = s + bias[i];
+        }
+    } else {
+        for (int i = 0; i < out_size; i++) {
+            float s = 0.0f;
+            for (int j = 0; j < in_size; j++) s += weights[i][j] * input[j];
+            out[i] = s + bias[i];
+        }
+    }
+    return out;
+}
+
+std::vector<float> FullyConnected::backward_nostate(
+    const std::vector<float>& grad_output,
+    const std::vector<float>& last_input_extern,
+    std::vector<std::vector<float>>& out_grad_weights,
+    std::vector<float>& out_grad_bias
+) {
+    out_grad_weights.assign(out_size, std::vector<float>(in_size, 0.0f));
+    out_grad_bias.assign(out_size, 0.0f);
+    std::vector<float> grad_input(in_size, 0.0f);
+
+    for (int i = 0; i < out_size; i++) {
+        out_grad_bias[i] += grad_output[i];
+        for (int j = 0; j < in_size; j++) {
+            out_grad_weights[i][j] += last_input_extern[j] * grad_output[i];
+            grad_input[j] += weights[i][j] * grad_output[i];
+        }
+    }
+    return grad_input;
+}
+
+
+std::vector<float> Softmax::forward_nostate(const std::vector<float>& input, std::vector<float>& out_last_output) {
+    float max_val = *std::max_element(input.begin(), input.end());
+    std::vector<float> out(input.size());
+    float sum = 0;
+    for (size_t i = 0; i < input.size(); i++) {
+        out[i] = std::exp(input[i] - max_val);
+        sum += out[i];
+    }
+    for (auto& v : out) v /= sum;
+    out_last_output = out;
+    return out;
+}
+
+std::vector<float> Softmax::backward_nostate(const std::vector<float>& grad_output, const std::vector<float>& last_output_extern) {
+    // assuming cross-entropy combined -> identity. Use grad_output directly
+    return grad_output;
 }
