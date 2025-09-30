@@ -6,113 +6,139 @@
 #include <iostream>
 #include <iomanip>
 #include <random>
+#include <string>
 
-// Base layer
+
+struct Tensor {
+    std::vector<float> data;   // valores flattened
+    std::vector<int> shape;    // [C, H, W]
+
+    Tensor() {}
+    Tensor(const std::vector<float>& d, const std::vector<int>& s)
+        : data(d), shape(s) {}
+
+    // utilitário para acessar em 3D
+    inline float& at(int c, int i, int j) {
+        return data[(c * shape[1] + i) * shape[2] + j];
+    }
+    inline float at(int c, int i, int j) const {
+        return data[(c * shape[1] + i) * shape[2] + j];
+    }
+};
+
 class Layer {
 public:
     virtual std::string name() const = 0;
-    virtual void debugPrint() const = 0;
-    virtual void update(float lr) {}   // default: nothing
+
+    virtual Tensor forward(const Tensor& input) = 0;
+    virtual Tensor backward(const Tensor& grad_output) = 0;
+    virtual void update(float lr) {}
+
     virtual ~Layer() {}
-
-    // nao colocar forward e backward aq pq tem 2d e 1d !
 };
 
-// =================== Conv2D ===================
 class Conv2D : public Layer {
+    int in_channels, out_channels, kernel_size, stride;
+    std::vector<float> weights;     // [out, in, k, k]
+    std::vector<float> bias;        // [out]
+
+    Tensor input_cache;             // para backward
+    Tensor grad_weights;            // mesmo shape de weights
+    std::vector<float> grad_bias;   // [out]
+
 public:
-    int input_dim, kernel_size, num_filters;
-    std::vector<std::vector<std::vector<float>>> kernels;     // [num_filters][kH][kW]
-    std::vector<std::vector<std::vector<float>>> grad_kernels; // gradientes acumulados
-    std::vector<std::vector<float>> last_input; // input armazenado
+    Conv2D(int in_c, int out_c, int k, int s=1);
 
-    static double total_forward_time;   
-    static double total_backward_time;
-    static double total_update_time;
+    std::string name() const override;
 
-    Conv2D(int input_dim, int kernel_size, int num_filters);
-
-    std::string name() const override { return "Conv2D"; }
-
-    // forward: input 2D -> output 3D (num_filters mapas)
-    std::vector<std::vector<std::vector<float>>> forward(const std::vector<std::vector<float>>& input);
-
-    // backward: grad_output 3D (mesma forma da saída do forward)
-    std::vector<std::vector<float>> backward(const std::vector<std::vector<std::vector<float>>>& grad_output);
-
+    Tensor forward(const Tensor& input) override;
+    Tensor backward(const Tensor& grad_output) override;
     void update(float lr) override;
-    void debugPrint() const override;
+
+    static double total_forward_time;
+    static double total_backward_time;
 };
 
-// =================== ReLU ===================
 class ReLU : public Layer {
+    Tensor input_cache; // guarda entrada p backward
+
 public:
-    std::vector<std::vector<float>> last_input;
+    ReLU();
 
-    static double total_forward_time;   
+    std::string name() const override;
+
+    Tensor forward(const Tensor& input) override;
+    Tensor backward(const Tensor& grad_output) override;
+
+    static double total_forward_time;
     static double total_backward_time;
-
-    std::string name() const override { return "ReLU"; }
-    std::vector<std::vector<float>> forward(const std::vector<std::vector<float>>& input);
-    std::vector<std::vector<float>> backward(const std::vector<std::vector<float>>& grad_output);
-    void debugPrint() const override;
 };
 
-// =================== MaxPool2x2 ===================
 class MaxPool2x2 : public Layer {
+    Tensor input_cache;            // salva a entrada para o backward
+    std::vector<int> max_indices;  // salva os índices máximos para cada célula
+
 public:
-    int input_dim;
-    std::vector<std::vector<float>> last_input;
-    std::vector<int> max_indices;
+    MaxPool2x2();
 
-    static double total_forward_time;   
+    std::string name() const override;
+
+    Tensor forward(const Tensor& input) override;
+    Tensor backward(const Tensor& grad_output) override;
+
+    static double total_forward_time;
     static double total_backward_time;
-
-    MaxPool2x2(int input_dim);
-    std::string name() const override { return "MaxPool2x2"; }
-    std::vector<std::vector<float>> forward(const std::vector<std::vector<float>>& input);
-    std::vector<std::vector<float>> backward(const std::vector<std::vector<float>>& grad_output);
-    void debugPrint() const override;
 };
 
-// =================== FullyConnected ===================
 class FullyConnected : public Layer {
+    int in_size = -1;
+    int out_size;
+    std::vector<float> weights;    // flattened [out * in]
+    std::vector<float> bias;       // [out]
+
+    Tensor input_cache;            // para backward
+    std::vector<float> grad_weights;  // flattened
+    std::vector<float> grad_bias;     // [out]
+
 public:
-    int in_size, out_size;
-    std::vector<std::vector<float>> weights;
-    std::vector<float> bias;
+    FullyConnected(int out_size);
 
-    // gradientes
-    std::vector<std::vector<float>> grad_weights;
-    std::vector<float> grad_bias;
+    std::string name() const override;
 
-    std::vector<float> last_input;
-
-    static double total_forward_time;   
-    static double total_backward_time;
-    static double total_update_time;
-
-    FullyConnected(int in_size, int out_size);
-
-    std::string name() const override { return "FullyConnected"; }
-    std::vector<float> forward(const std::vector<float>& input);
-    std::vector<float> backward(const std::vector<float>& grad_output);
+    void init_from_tensor(const Tensor& input);
+    Tensor forward(const Tensor& input) override;
+    Tensor backward(const Tensor& grad_output) override;
     void update(float lr) override;
-    void debugPrint() const override;
+    
+    static double total_forward_time;
+    static double total_backward_time;
 };
 
-// =================== Softmax ===================
 class Softmax : public Layer {
+    Tensor output_cache;
+
 public:
-    std::vector<float> last_output;
+    Softmax() {}
 
-    static double total_forward_time;   
+    std::string name() const override;
+
+    Tensor forward(const Tensor& input) override;
+    Tensor backward(const Tensor& grad_output) override; 
+
+    static double total_forward_time;
     static double total_backward_time;
+};
 
-    std::string name() const override { return "Softmax"; }
-    std::vector<float> forward(const std::vector<float>& input);
-    std::vector<float> backward(const std::vector<float>& grad_output);
-    void debugPrint() const override;
+class Flatten : public Layer {
+    std::vector<int> input_shape;
+
+public:
+    Flatten() {}
+
+    std::string name() const override { return "Flatten"; }
+
+    Tensor forward(const Tensor& input) override;
+    Tensor backward(const Tensor& grad_output) override;
 };
 
 #endif

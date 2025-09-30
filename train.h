@@ -10,35 +10,22 @@ std::vector<float> cross_entropy_grad(const std::vector<float>& probs, int label
 std::vector<float> flatten(const std::vector<std::vector<float>>& input2D);
 std::vector<std::vector<float>> flatten_backward(const std::vector<float>& grad1D, const std::vector<std::vector<float>>& ref2D);
 
-// ======================== train / eval ========================
 void train_epoch(
-    Conv2D& conv,
-    ReLU& relu,
-    MaxPool2x2& pool,
-    FullyConnected& fc,
-    Softmax& softmax,
+    std::vector<Layer*>& layers,
     const std::vector<std::vector<std::vector<float>>>& images, // [N][28][28]
     const std::vector<int>& labels,
     float lr
 );
 
-float evaluate(
-    Conv2D& conv,
-    ReLU& relu,
-    MaxPool2x2& pool,
-    FullyConnected& fc,
-    Softmax& softmax,
-    const std::vector<std::vector<std::vector<float>>>& images,
+void evaluate(
+    const std::vector<Layer*>& layers,
+    const std::vector<std::vector<std::vector<float>>>& images, // [N][28][28]
     const std::vector<int>& labels
 );
 
 int predict(
-    Conv2D& conv,
-    ReLU& relu,
-    MaxPool2x2& pool,
-    FullyConnected& fc,
-    Softmax& softmax,
-    const std::vector<std::vector<float>>& image 
+    const std::vector<Layer*>& layers,
+    const std::vector<std::vector<float>>& image // [28][28]
 );
 
 #endif

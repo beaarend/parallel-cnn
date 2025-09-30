@@ -60,13 +60,8 @@ std::vector<std::vector<std::vector<float>>> flatten3D_backward(
     return output;
 }
 
-// ======================== train ========================
 void train_epoch(
-    Conv2D& conv,
-    ReLU& relu,
-    MaxPool2x2& pool,
-    FullyConnected& fc,
-    Softmax& softmax,
+    std::vector<Layer*>& layers,
     const std::vector<std::vector<std::vector<float>>>& images,
     const std::vector<int>& labels,
     float lr
@@ -74,110 +69,90 @@ void train_epoch(
     float total_loss = 0.0f;
     int correct = 0;
 
+    // std::cout << "entrou train epoch\n";
+
     for (size_t n = 0; n < images.size(); n++) {
-        // forward
-        auto out1 = conv.forward(images[n]);              // 3D (num_filters × H × W)
-        std::vector<std::vector<std::vector<float>>> out2(out1.size());
-        std::vector<std::vector<std::vector<float>>> out_pool(out1.size());
+        // wrap input as Tensor (1 channel, H, W)
+        int h = images[n].size();
+        int w = images[n][0].size();
 
-        for (size_t f = 0; f < out1.size(); f++) {
-            auto relu_out = relu.forward(out1[f]);        // ReLU por filtro (2D)
-            out2[f] = relu_out;
-            out_pool[f] = pool.forward(relu_out);         // Pool por filtro (2D)
+        // std::cout << "imagem " << n << " tamanho " << h << "x" << w << "\n";
+
+        Tensor x(flatten3D({images[n]}), {1, h, w});
+
+        // std::cout << "depois flatten\n";
+
+        std::vector<Tensor> activations;
+        activations.push_back(x);
+
+        // std::cout << "depois de activation\n";
+
+        // forward pass
+        for (auto* layer : layers) {
+            // std::cout << "Layer: " << layer->name() << "\n";
+            x = layer->forward(x);
+            activations.push_back(x);
         }
-
-        auto flat = flatten3D(out_pool);                  // flatten 3D -> 1D
-        auto out3 = fc.forward(flat);                     // 1D
-        auto out4 = softmax.forward(out3);                // 1D
 
         // loss
-        total_loss += cross_entropy_loss(out4, labels[n]);
-        int pred = std::distance(out4.begin(), std::max_element(out4.begin(), out4.end()));
+        auto& probs = activations.back().data;
+        total_loss += cross_entropy_loss(probs, labels[n]);
+        int pred = std::distance(probs.begin(), std::max_element(probs.begin(), probs.end()));
         if (pred == labels[n]) correct++;
 
-        // backward
-        auto grad = cross_entropy_grad(out4, labels[n]);  // 1D
-        grad = softmax.backward(grad);                    // 1D
-        grad = fc.backward(grad);                         // 1D
-        fc.update(lr);
-
-        auto grad3D = flatten3D_backward(grad, out_pool); // 1D -> 3D (forma de out_pool)
-
-        std::vector<std::vector<std::vector<float>>> grad_relu(out1.size());
-        for (size_t f = 0; f < out1.size(); f++) {
-            auto grad_pool = pool.backward(grad3D[f]);    // unpool grad
-            grad_relu[f] = relu.backward(grad_pool);      // ReLU backward
+        // backward pass
+        Tensor grad(cross_entropy_grad(probs, labels[n]), {(int)probs.size()});
+        for (int i = layers.size() - 1; i >= 0; i--) {
+            grad = layers[i]->backward(grad);
+            layers[i]->update(lr);
         }
-
-        auto grad_input = conv.backward(grad_relu);       // 2D grad
-        conv.update(lr);
     }
 
     std::cout << "Train Loss: " << total_loss / images.size()
               << " | Acc: " << (float)correct / images.size() << "\n";
 }
 
-
-// ======================== eval ========================
-float evaluate(
-    Conv2D& conv,
-    ReLU& relu,
-    MaxPool2x2& pool,
-    FullyConnected& fc,
-    Softmax& softmax,
-    const std::vector<std::vector<std::vector<float>>>& images,
-    const std::vector<int>& labels
-){
+// ======================== evaluate ========================
+void evaluate(const std::vector<Layer*>& layers,
+               const std::vector<std::vector<std::vector<float>>>& images,
+               const std::vector<int>& labels) 
+{
     int correct = 0;
+
     for (size_t n = 0; n < images.size(); n++) {
-        auto out1 = conv.forward(images[n]); // 3D
+        int h = images[n].size();
+        int w = images[n][0].size();
 
-        std::vector<std::vector<std::vector<float>>> out2(out1.size());
-        std::vector<std::vector<std::vector<float>>> out_pool(out1.size());
+        Tensor x(flatten3D({images[n]}), {1, h, w});
 
-        for (size_t f = 0; f < out1.size(); f++) {
-            auto relu_out = relu.forward(out1[f]);
-            out2[f] = relu_out;
-            out_pool[f] = pool.forward(relu_out);         // aplica pooling
+        // forward pass through all layers
+        for (auto* layer : layers) {
+            x = layer->forward(x);
         }
 
-        auto flat = flatten3D(out_pool);     // 3D -> 1D
-        auto out3 = fc.forward(flat);        // 1D
-        auto out4 = softmax.forward(out3);   // 1D
-
-        int pred = std::distance(out4.begin(), std::max_element(out4.begin(), out4.end()));
+        auto& probs = x.data;
+        int pred = std::distance(probs.begin(), std::max_element(probs.begin(), probs.end()));
         if (pred == labels[n]) correct++;
     }
-    return (float)correct / images.size();
+
+    std::cout << "Eval Acc: " << (float)correct / images.size() << "\n";
 }
 
-int predict(
-    Conv2D& conv,
-    ReLU& relu,
-    MaxPool2x2& pool,
-    FullyConnected& fc,
-    Softmax& softmax,
-    const std::vector<std::vector<float>>& image // <-- 2D
-) {
+// ======================== predict ========================
+int predict(const std::vector<Layer*>& layers,
+            const std::vector<std::vector<float>>& image2D) 
+{
+    int h = image2D.size();
+    int w = image2D[0].size();
 
-    auto conv_out = conv.forward(image); 
-    std::vector<std::vector<std::vector<float>>> relu_out_volume(conv_out.size());
-    std::vector<std::vector<std::vector<float>>> pool_out_volume(conv_out.size());
+    Tensor x(flatten({image2D}), {1, h, w});
 
-    for (size_t f = 0; f < conv_out.size(); f++) {
-        auto relu_out = relu.forward(conv_out[f]);
-        relu_out_volume[f] = relu_out;
-
-        auto pool_out = pool.forward(relu_out);
-        pool_out_volume[f] = pool_out;
+    // forward pass through all layers
+    for (auto* layer : layers) {
+        x = layer->forward(x);
     }
 
-    auto flat_vector = flatten3D(pool_out_volume);
-    auto fc_out = fc.forward(flat_vector);
-    auto probabilities = softmax.forward(fc_out);
-
-    int prediction = std::distance(probabilities.begin(),
-                                   std::max_element(probabilities.begin(), probabilities.end()));
-
-    return prediction;
+    auto& probs = x.data;
+    int pred = std::distance(probs.begin(), std::max_element(probs.begin(), probs.end()));
+    return pred;
 }
