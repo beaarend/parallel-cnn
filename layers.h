@@ -9,20 +9,46 @@
 #include <string>
 
 
+// struct Tensor {
+//     std::vector<float> data;   // valores flattened
+//     std::vector<int> shape;    // [C, H, W]
+
+//     Tensor() {}
+//     Tensor(const std::vector<float>& d, const std::vector<int>& s)
+//         : data(d), shape(s) {}
+
+//     // utilitário para acessar em 3D
+//     inline float& at(int c, int i, int j) {
+//         return data[(c * shape[1] + i) * shape[2] + j];
+//     }
+//     inline float at(int c, int i, int j) const {
+//         return data[(c * shape[1] + i) * shape[2] + j];
+//     }
+// };
+
 struct Tensor {
-    std::vector<float> data;   // valores flattened
-    std::vector<int> shape;    // [C, H, W]
+    std::vector<float> data;
+    std::vector<int> shape; // [N, C, H, W]
 
     Tensor() {}
     Tensor(const std::vector<float>& d, const std::vector<int>& s)
         : data(d), shape(s) {}
 
-    // utilitário para acessar em 3D
-    inline float& at(int c, int i, int j) {
-        return data[(c * shape[1] + i) * shape[2] + j];
+    // Access [n, c, i, j]
+    inline float& at(int n, int c, int i, int j) {
+        int C = shape[1], H = shape[2], W = shape[3];
+        return data[((n*C + c)*H + i)*W + j];
     }
-    inline float at(int c, int i, int j) const {
-        return data[(c * shape[1] + i) * shape[2] + j];
+    inline float at(int n, int c, int i, int j) const {
+        int C = shape[1], H = shape[2], W = shape[3];
+        return data[((n*C + c)*H + i)*W + j];
+    }
+
+    // Total number of elements
+    inline int size() const {
+        int s = 1;
+        for (auto dim : shape) s *= dim;
+        return s;
     }
 };
 

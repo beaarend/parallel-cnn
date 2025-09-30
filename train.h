@@ -17,6 +17,14 @@ void train_epoch(
     float lr
 );
 
+void train_epoch_batch(
+    std::vector<Layer*>& layers,
+    const std::vector<std::vector<std::vector<float>>>& images, // [N][28][28]
+    const std::vector<int>& labels,
+    float lr,
+    int batch_size
+);
+
 void evaluate(
     const std::vector<Layer*>& layers,
     const std::vector<std::vector<std::vector<float>>>& images, // [N][28][28]
