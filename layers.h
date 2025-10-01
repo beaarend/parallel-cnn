@@ -7,7 +7,7 @@
 #include <iomanip>
 #include <random>
 #include <string>
-
+#include <utility>
 
 struct Tensor {
     std::vector<float> data;   // valores flattened
@@ -29,11 +29,9 @@ struct Tensor {
 class Layer {
 public:
     virtual std::string name() const = 0;
-
-    virtual Tensor forward(const Tensor& input) = 0;
-    virtual Tensor backward(const Tensor& grad_output) = 0;
+    virtual std::pair<Tensor, double> forward(const Tensor& input) = 0;
+    virtual std::pair<Tensor, double> backward(const Tensor& grad_output) = 0;
     virtual void update(float lr) {}
-
     virtual ~Layer() {}
 };
 
@@ -51,8 +49,8 @@ public:
 
     std::string name() const override;
 
-    Tensor forward(const Tensor& input) override;
-    Tensor backward(const Tensor& grad_output) override;
+    std::pair<Tensor, double> forward(const Tensor& input) override;
+    std::pair<Tensor, double> backward(const Tensor& grad_output) override;
     void update(float lr) override;
 
     static double total_forward_time;
@@ -67,8 +65,8 @@ public:
 
     std::string name() const override;
 
-    Tensor forward(const Tensor& input) override;
-    Tensor backward(const Tensor& grad_output) override;
+    std::pair<Tensor, double> forward(const Tensor& input) override;
+    std::pair<Tensor, double> backward(const Tensor& grad_output) override;
 
     static double total_forward_time;
     static double total_backward_time;
@@ -83,8 +81,8 @@ public:
 
     std::string name() const override;
 
-    Tensor forward(const Tensor& input) override;
-    Tensor backward(const Tensor& grad_output) override;
+    std::pair<Tensor, double> forward(const Tensor& input) override;
+    std::pair<Tensor, double> backward(const Tensor& grad_output) override;
 
     static double total_forward_time;
     static double total_backward_time;
@@ -106,8 +104,8 @@ public:
     std::string name() const override;
 
     void init_from_tensor(const Tensor& input);
-    Tensor forward(const Tensor& input) override;
-    Tensor backward(const Tensor& grad_output) override;
+    std::pair<Tensor, double> forward(const Tensor& input) override;
+    std::pair<Tensor, double> backward(const Tensor& grad_output) override;
     void update(float lr) override;
     
     static double total_forward_time;
@@ -122,8 +120,8 @@ public:
 
     std::string name() const override;
 
-    Tensor forward(const Tensor& input) override;
-    Tensor backward(const Tensor& grad_output) override; 
+    std::pair<Tensor, double> forward(const Tensor& input) override;
+    std::pair<Tensor, double> backward(const Tensor& grad_output) override; 
 
     static double total_forward_time;
     static double total_backward_time;
@@ -137,8 +135,8 @@ public:
 
     std::string name() const override { return "Flatten"; }
 
-    Tensor forward(const Tensor& input) override;
-    Tensor backward(const Tensor& grad_output) override;
+    std::pair<Tensor, double> forward(const Tensor& input) override;
+    std::pair<Tensor, double> backward(const Tensor& grad_output) override;
 };
 
 #endif

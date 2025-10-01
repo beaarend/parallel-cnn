@@ -68,6 +68,8 @@ void train_epoch(
 ) {
     float total_loss = 0.0f;
     int correct = 0;
+    double total_forward_time = 0.0;
+    double total_backward_time = 0.0;
 
     // std::cout << "entrou train epoch\n";
 
@@ -84,15 +86,16 @@ void train_epoch(
 
         std::vector<Tensor> activations;
         activations.push_back(x);
-
-        // std::cout << "depois de activation\n";
+        double sample_forward_time = 0.0;
 
         // forward pass
         for (auto* layer : layers) {
-            // std::cout << "Layer: " << layer->name() << "\n";
-            x = layer->forward(x);
+            auto [out, dur] = layer->forward(x);
+            x = out;
             activations.push_back(x);
+            sample_forward_time += dur;
         }
+        total_forward_time += sample_forward_time;
 
         // loss
         auto& probs = activations.back().data;
@@ -102,14 +105,20 @@ void train_epoch(
 
         // backward pass
         Tensor grad(cross_entropy_grad(probs, labels[n]), {(int)probs.size()});
+        double sample_backward_time = 0.0;
         for (int i = layers.size() - 1; i >= 0; i--) {
-            grad = layers[i]->backward(grad);
+            auto [g, dur] = layers[i]->backward(grad);
+            grad = g;
             layers[i]->update(lr);
+            sample_backward_time += dur;
         }
+        total_backward_time += sample_backward_time;
     }
 
     std::cout << "Train Loss: " << total_loss / images.size()
               << " | Acc: " << (float)correct / images.size() << "\n";
+    std::cout << "Total Forward Time (ms): " << total_forward_time << "\n";
+    std::cout << "Total Backward Time (ms): " << total_backward_time << "\n";
 }
 
 // ======================== evaluate ========================
@@ -127,7 +136,8 @@ void evaluate(const std::vector<Layer*>& layers,
 
         // forward pass through all layers
         for (auto* layer : layers) {
-            x = layer->forward(x);
+            auto [out, not_used] = layer->forward(x);
+            x = out;
         }
 
         auto& probs = x.data;
@@ -149,7 +159,8 @@ int predict(const std::vector<Layer*>& layers,
 
     // forward pass through all layers
     for (auto* layer : layers) {
-        x = layer->forward(x);
+        auto [out, not_used] = layer->forward(x);
+        x = out;
     }
 
     auto& probs = x.data;

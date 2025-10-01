@@ -29,10 +29,8 @@ Conv2D::Conv2D(int in_c, int out_c, int k, int s)
 
 std::string Conv2D::name() const { return "Conv2D"; }
 
-Tensor Conv2D::forward(const Tensor& input) {
-
+std::pair<Tensor, double> Conv2D::forward(const Tensor& input) {
     auto start = std::chrono::high_resolution_clock::now();
-
     input_cache = input;
 
     int H = input.shape[1];
@@ -43,6 +41,9 @@ Tensor Conv2D::forward(const Tensor& input) {
     Tensor out(std::vector<float>(out_channels * out_H * out_W, 0.0f),
                {out_channels, out_H, out_W});
 
+    // OTIMIZAÇÃO: Paraleliza os loops sobre os canais de saída e as dimensões espaciais.
+    // O cálculo de cada ponto de saída é uma operação independente.
+    #pragma omp parallel for collapse(3) schedule(dynamic)
     for (int oc = 0; oc < out_channels; oc++) {
         for (int i = 0; i < out_H; i++) {
             for (int j = 0; j < out_W; j++) {
@@ -63,13 +64,12 @@ Tensor Conv2D::forward(const Tensor& input) {
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    total_forward_time += std::chrono::duration<double, std::milli>(end - start).count();
-
-    return out;
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    Conv2D::total_forward_time += duration;
+    return {out, duration};
 }
 
-Tensor Conv2D::backward(const Tensor& grad_output) {
-
+std::pair<Tensor, double> Conv2D::backward(const Tensor& grad_output) {
     auto start = std::chrono::high_resolution_clock::now();
 
     int H = input_cache.shape[1];
@@ -77,29 +77,38 @@ Tensor Conv2D::backward(const Tensor& grad_output) {
     int out_H = grad_output.shape[1];
     int out_W = grad_output.shape[2];
 
-    Tensor grad_input(std::vector<float>(in_channels * H * W, 0.0f),
-                      {in_channels, H, W});
-
+    Tensor grad_input(std::vector<float>(in_channels * H * W, 0.0f), {in_channels, H, W});
     std::fill(grad_weights.data.begin(), grad_weights.data.end(), 0.0f);
     std::fill(grad_bias.begin(), grad_bias.end(), 0.0f);
 
+    int nthreads = 1;
+    #pragma omp parallel
+    {
+        #pragma omp single
+        nthreads = omp_get_num_threads();
+    }
+
+    // Thread-private buffers
+    std::vector<std::vector<float>> priv_grad_weights(nthreads, std::vector<float>(grad_weights.data.size(), 0.0f));
+    std::vector<std::vector<float>> priv_grad_bias(nthreads, std::vector<float>(grad_bias.size(), 0.0f));
+    std::vector<std::vector<float>> priv_grad_input(nthreads, std::vector<float>(grad_input.data.size(), 0.0f));
+
+    #pragma omp parallel for collapse(3) schedule(dynamic)
     for (int oc = 0; oc < out_channels; oc++) {
         for (int i = 0; i < out_H; i++) {
             for (int j = 0; j < out_W; j++) {
+                int tid = omp_get_thread_num();
                 float go = grad_output.at(oc, i, j);
-                grad_bias[oc] += go;
-
+                priv_grad_bias[tid][oc] += go;
                 for (int ic = 0; ic < in_channels; ic++) {
                     for (int ki = 0; ki < kernel_size; ki++) {
                         for (int kj = 0; kj < kernel_size; kj++) {
                             int xi = i * stride + ki;
                             int xj = j * stride + kj;
-
-                            grad_weights.data[ ((oc*in_channels+ic)*kernel_size+ki)*kernel_size + kj ]
-                                += input_cache.at(ic, xi, xj) * go;
-
-                            grad_input.at(ic, xi, xj) +=
-                                weights[ ((oc*in_channels+ic)*kernel_size+ki)*kernel_size + kj ] * go;
+                            int widx = ((oc*in_channels+ic)*kernel_size+ki)*kernel_size + kj;
+                            priv_grad_weights[tid][widx] += input_cache.at(ic, xi, xj) * go;
+                            int gidx = (ic * H + xi) * W + xj;
+                            priv_grad_input[tid][gidx] += weights[widx] * go;
                         }
                     }
                 }
@@ -107,10 +116,20 @@ Tensor Conv2D::backward(const Tensor& grad_output) {
         }
     }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    total_backward_time += std::chrono::duration<double, std::milli>(end - start).count();
+    // Reduce thread-private buffers into main gradients
+    for (int t = 0; t < nthreads; ++t) {
+        for (size_t i = 0; i < grad_weights.data.size(); ++i)
+            grad_weights.data[i] += priv_grad_weights[t][i];
+        for (size_t i = 0; i < grad_bias.size(); ++i)
+            grad_bias[i] += priv_grad_bias[t][i];
+        for (size_t i = 0; i < grad_input.data.size(); ++i)
+            grad_input.data[i] += priv_grad_input[t][i];
+    }
 
-    return grad_input;
+    auto end = std::chrono::high_resolution_clock::now();
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    Conv2D::total_backward_time += duration;
+    return {grad_input, duration};
 }
 
 void Conv2D::update(float lr) {
@@ -133,39 +152,39 @@ std::string ReLU::name() const {
     return "ReLU";
 }
 
-Tensor ReLU::forward(const Tensor& input) {
+std::pair<Tensor, double> ReLU::forward(const Tensor& input) {
     auto start = std::chrono::high_resolution_clock::now();
 
     input_cache = input;
     Tensor out(input.data, input.shape);
 
+    // OTIMIZAÇÃO: Paraleliza o loop sobre todos os elementos do tensor.
+    #pragma omp parallel for schedule(static)
     for (size_t idx = 0; idx < out.data.size(); idx++) {
         out.data[idx] = std::max(0.0f, out.data[idx]);
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    total_forward_time += std::chrono::duration<double, std::milli>(end - start).count();
-
-    return out;
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    ReLU::total_forward_time += duration;
+    return {out, duration};
 }
 
-Tensor ReLU::backward(const Tensor& grad_output) {
+std::pair<Tensor, double> ReLU::backward(const Tensor& grad_output) {
     auto start = std::chrono::high_resolution_clock::now();
 
     Tensor grad(grad_output.data, grad_output.shape);
 
-    for (int c = 0; c < grad.shape[0]; c++) {
-        for (int i = 0; i < grad.shape[1]; i++) {
-            for (int j = 0; j < grad.shape[2]; j++) {
-                grad.at(c, i, j) *= (input_cache.at(c, i, j) > 0 ? 1.0f : 0.0f);
-            }
-        }
+    // OTIMIZAÇÃO: Paraleliza o loop sobre todos os elementos.
+    #pragma omp parallel for schedule(static)
+    for (size_t idx = 0; idx < grad.data.size(); idx++) {
+        grad.data[idx] *= (input_cache.data[idx] > 0 ? 1.0f : 0.0f);
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    total_backward_time += std::chrono::duration<double, std::milli>(end - start).count();
-
-    return grad;
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    ReLU::total_backward_time += duration;
+    return {grad, duration};
 }
 
 // ================================================================== MAXPOOL
@@ -179,7 +198,7 @@ std::string MaxPool2x2::name() const {
     return "MaxPool2x2";
 }
 
-Tensor MaxPool2x2::forward(const Tensor& input) {
+std::pair<Tensor, double> MaxPool2x2::forward(const Tensor& input) {
     auto start = std::chrono::high_resolution_clock::now();
 
     input_cache = input;
@@ -191,13 +210,16 @@ Tensor MaxPool2x2::forward(const Tensor& input) {
     int out_W = W / 2;
 
     Tensor output(std::vector<float>(C * out_H * out_W, 0.0f), {C, out_H, out_W});
-    max_indices.clear();
-    max_indices.reserve(C * out_H * out_W);
+    
+    // Vetor pre alocado e mais eficiente que push_back
+    max_indices.assign(C * out_H * out_W, 0);
 
+    // OTIMIZAÇÃO: Paraleliza sobre os canais, altura e largura da saída.
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int c = 0; c < C; c++) {
         for (int i = 0; i < out_H; i++) {
             for (int j = 0; j < out_W; j++) {
-                float max_val = -1e9;
+                float max_val = -1e9f;
                 int max_idx = -1;
 
                 for (int di = 0; di < 2; di++) {
@@ -212,20 +234,18 @@ Tensor MaxPool2x2::forward(const Tensor& input) {
                     }
                 }
                 output.at(c, i, j) = max_val;
-                max_indices.push_back(max_idx);
+                max_indices[(c * out_H + i) * out_W + j] = max_idx;
             }
         }
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    total_forward_time += std::chrono::duration<double, std::milli>(end - start).count();
-
-    // std::cout << "MaxPool2x2 output shape: [" << C << ", " << out_H << ", " << out_W << "]\n";
-
-    return output;
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    MaxPool2x2::total_forward_time += duration;
+    return {output, duration};
 }
 
-Tensor MaxPool2x2::backward(const Tensor& grad_output) {
+std::pair<Tensor, double> MaxPool2x2::backward(const Tensor& grad_output) {
     auto start = std::chrono::high_resolution_clock::now();
 
     int C = input_cache.shape[0];
@@ -236,24 +256,23 @@ Tensor MaxPool2x2::backward(const Tensor& grad_output) {
     int out_H = grad_output.shape[1];
     int out_W = grad_output.shape[2];
 
+    // OTIMIZAÇÃO: O cálculo para cada ponto da saída é independente e escreve
+    // em uma posição única da entrada, então a paralelização é segura.
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int c = 0; c < C; c++) {
         for (int i = 0; i < out_H; i++) {
             for (int j = 0; j < out_W; j++) {
                 int idx = (c * out_H + i) * out_W + j;
                 int max_idx = max_indices[idx];
-
-                int r = (max_idx / W) % H;
-                int cc = max_idx % W;
-
-                grad_input.at(c, r, cc) = grad_output.at(c, i, j);
+                grad_input.data[max_idx] = grad_output.at(c, i, j);
             }
         }
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    total_backward_time += std::chrono::duration<double, std::milli>(end - start).count();
-
-    return grad_input;
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    MaxPool2x2::total_backward_time += duration;
+    return {grad_input, duration};
 }
 
 // ================================================================== FULLYCONNECTED
@@ -282,8 +301,7 @@ void FullyConnected::init_from_tensor(const Tensor& input) {
 
 std::string FullyConnected::name() const { return "FullyConnected"; }
 
-Tensor FullyConnected::forward(const Tensor& input) {
-
+std::pair<Tensor, double> FullyConnected::forward(const Tensor& input) {
     if (in_size == -1) init_from_tensor(input);
 
     auto start = std::chrono::high_resolution_clock::now();
@@ -291,6 +309,8 @@ Tensor FullyConnected::forward(const Tensor& input) {
     input_cache = input;
     Tensor out(std::vector<float>(out_size, 0.0f), {out_size, 1, 1});
 
+    // OTIMIZAÇÃO: O cálculo de cada neurônio de saída é independente.
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < out_size; i++) {
         float sum = bias[i];
         for (int j = 0; j < in_size; j++)
@@ -299,29 +319,33 @@ Tensor FullyConnected::forward(const Tensor& input) {
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    total_forward_time += std::chrono::duration<double, std::milli>(end - start).count();
-
-    return out;
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    FullyConnected::total_forward_time += duration;
+    return {out, duration};
 }
 
-Tensor FullyConnected::backward(const Tensor& grad_output) {
-
+std::pair<Tensor, double> FullyConnected::backward(const Tensor& grad_output) {
     auto start = std::chrono::high_resolution_clock::now();
 
     Tensor grad_input(std::vector<float>(in_size, 0.0f), {in_size, 1, 1});
+    std::fill(grad_weights.begin(), grad_weights.end(), 0.0f);
+    std::fill(grad_bias.begin(), grad_bias.end(), 0.0f);
 
+    #pragma omp parallel for schedule(static)
     for (int i = 0; i < out_size; i++) {
-        grad_bias[i] = grad_output.data[i];
+        float go = grad_output.data[i];
+        grad_bias[i] += go;
         for (int j = 0; j < in_size; j++) {
-            grad_weights[i * in_size + j] = input_cache.data[j] * grad_output.data[i];
-            grad_input.data[j] += weights[i * in_size + j] * grad_output.data[i];
+            grad_weights[i * in_size + j] += input_cache.data[j] * go;
+            #pragma omp atomic
+            grad_input.data[j] += weights[i * in_size + j] * go;
         }
     }
 
     auto end = std::chrono::high_resolution_clock::now();
-    total_backward_time += std::chrono::duration<double, std::milli>(end - start).count();
-
-    return grad_input;
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    FullyConnected::total_backward_time += duration;
+    return {grad_input, duration};
 }
 
 void FullyConnected::update(float lr) {
@@ -338,7 +362,7 @@ double Softmax::total_backward_time = 0.0;
 
 std::string Softmax::name() const { return "Softmax"; }
 
-Tensor Softmax::forward(const Tensor& input) {
+std::pair<Tensor, double> Softmax::forward(const Tensor& input) {
 
     auto start = std::chrono::high_resolution_clock::now();
 
@@ -360,27 +384,29 @@ Tensor Softmax::forward(const Tensor& input) {
     output_cache = out; // cache output para debug
 
     auto end = std::chrono::high_resolution_clock::now();
-    total_forward_time += std::chrono::duration<double, std::milli>(end - start).count();
+    double duration = std::chrono::duration<double, std::milli>(end - start).count();
+    Softmax::total_forward_time += duration;
 
-    return out;
+    return {out, duration};
 
 }
 
-Tensor Softmax::backward(const Tensor& grad_output) {
-    return grad_output;
+std::pair<Tensor, double> Softmax::backward(const Tensor& grad_output) {
+    // Softmax backward is usually handled with loss, but for now just pass through
+    return {grad_output, 0.0};
 }
 
 // ================================================================== FLATTEN
 
 // [C,H,W] -> [C*H*W, 1, 1]
-Tensor Flatten::forward(const Tensor& input) {
+std::pair<Tensor, double> Flatten::forward(const Tensor& input) {
     input_shape = input.shape;
-    return Tensor(input.data, { (int)input.data.size(), 1, 1 });
+    return {Tensor(input.data, { (int)input.data.size(), 1, 1 }), 0.0};
 }
 
 // [C*H*W,1,1] -> [C,H,W]
-Tensor Flatten::backward(const Tensor& grad_output) {
+std::pair<Tensor, double> Flatten::backward(const Tensor& grad_output) {
     Tensor grad = grad_output;
     grad.shape = input_shape;
-    return grad;
+    return {grad, 0.0};
 }

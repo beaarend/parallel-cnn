@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <omp.h>
 
 void load_dataset_csv(const std::string& file_path,
                     std::vector<std::vector<std::vector<float>>>& images,
@@ -72,6 +73,7 @@ int main() {
     int epochs = 10;
     int n_images = 20;
     srand(42); // 
+    //omp_set_num_threads(6);
 
     // std::vector<Layer*> layers;
     // layers.push_back(new Conv2D(1, 3, 8, 1));  // in_channels=1, out_channels=8, kernel=3, stride=1
@@ -90,7 +92,7 @@ int main() {
     // layers.push_back(new ReLU());
     // layers.push_back(new FullyConnected(10));
     // layers.push_back(new Softmax());
-
+/*
     std::vector<Layer*> layers;
     layers.push_back(new Conv2D(1, 8, 3, 1));  // 1→8 channels
     layers.push_back(new ReLU());
@@ -100,6 +102,16 @@ int main() {
     layers.push_back(new MaxPool2x2());
     layers.push_back(new Flatten());
     layers.push_back(new FullyConnected(64)); // hidden layer
+    layers.push_back(new ReLU());
+    layers.push_back(new FullyConnected(10));
+    layers.push_back(new Softmax());
+*/
+    std::vector<Layer*> layers;
+    layers.push_back(new Conv2D(1, 128, 5, 1)); 
+    layers.push_back(new ReLU());
+    layers.push_back(new MaxPool2x2());
+    layers.push_back(new Flatten());
+    layers.push_back(new FullyConnected(64));
     layers.push_back(new ReLU());
     layers.push_back(new FullyConnected(10));
     layers.push_back(new Softmax());
