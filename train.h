@@ -12,20 +12,20 @@ std::vector<std::vector<float>> flatten_backward(const std::vector<float>& grad1
 
 void train_epoch(
     std::vector<Layer*>& layers,
-    const std::vector<std::vector<std::vector<float>>>& images, // [N][28][28]
+    const std::vector<std::vector<std::vector<std::vector<float>>>>& images, // [N][C][H][W]
     const std::vector<int>& labels,
     float lr
 );
 
 void evaluate(
     const std::vector<Layer*>& layers,
-    const std::vector<std::vector<std::vector<float>>>& images, // [N][28][28]
+    const std::vector<std::vector<std::vector<std::vector<float>>>>& images, // [N][C][H][W]
     const std::vector<int>& labels
 );
 
 int predict(
     const std::vector<Layer*>& layers,
-    const std::vector<std::vector<float>>& image // [28][28]
+    const std::vector<std::vector<std::vector<float>>>& image3D // [C][H][W]
 );
 
 #endif

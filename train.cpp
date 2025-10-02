@@ -62,7 +62,7 @@ std::vector<std::vector<std::vector<float>>> flatten3D_backward(
 
 void train_epoch(
     std::vector<Layer*>& layers,
-    const std::vector<std::vector<std::vector<float>>>& images,
+    const std::vector<std::vector<std::vector<std::vector<float>>>>& images,
     const std::vector<int>& labels,
     float lr
 ) {
@@ -75,12 +75,13 @@ void train_epoch(
 
     for (size_t n = 0; n < images.size(); n++) {
         // wrap input as Tensor (1 channel, H, W)
-        int h = images[n].size();
-        int w = images[n][0].size();
+        int c = images[n].size();        // 3
+        int h = images[n][0].size();     // 32
+        int w = images[n][0][0].size();  // 32
 
         // std::cout << "imagem " << n << " tamanho " << h << "x" << w << "\n";
 
-        Tensor x(flatten3D({images[n]}), {1, h, w});
+        Tensor x(flatten3D(images[n]), {c, h, w});
 
         // std::cout << "depois flatten\n";
 
@@ -123,16 +124,17 @@ void train_epoch(
 
 // ======================== evaluate ========================
 void evaluate(const std::vector<Layer*>& layers,
-               const std::vector<std::vector<std::vector<float>>>& images,
-               const std::vector<int>& labels) 
-{
+              const std::vector<std::vector<std::vector<std::vector<float>>>>& images,
+              const std::vector<int>& labels)
+              {
     int correct = 0;
 
     for (size_t n = 0; n < images.size(); n++) {
-        int h = images[n].size();
-        int w = images[n][0].size();
+        int c = images[n].size();
+        int h = images[n][0].size();
+        int w = images[n][0][0].size();
 
-        Tensor x(flatten3D({images[n]}), {1, h, w});
+        Tensor x(flatten3D(images[n]), {c, h, w});
 
         // forward pass through all layers
         for (auto* layer : layers) {
@@ -150,12 +152,13 @@ void evaluate(const std::vector<Layer*>& layers,
 
 // ======================== predict ========================
 int predict(const std::vector<Layer*>& layers,
-            const std::vector<std::vector<float>>& image2D) 
+            const std::vector<std::vector<std::vector<float>>>& image3D) 
 {
-    int h = image2D.size();
-    int w = image2D[0].size();
+    int c = image3D.size();
+    int h = image3D[0].size();
+    int w = image3D[0][0].size();
 
-    Tensor x(flatten({image2D}), {1, h, w});
+    Tensor x(flatten3D(image3D), {c, h, w});
 
     // forward pass through all layers
     for (auto* layer : layers) {

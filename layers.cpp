@@ -310,7 +310,7 @@ std::pair<Tensor, double> FullyConnected::forward(const Tensor& input) {
     Tensor out(std::vector<float>(out_size, 0.0f), {out_size, 1, 1});
 
     // OTIMIZAÇÃO: O cálculo de cada neurônio de saída é independente.
-    #pragma omp parallel for schedule(static)
+    // #pragma omp parallel for schedule(static)
     for (int i = 0; i < out_size; i++) {
         float sum = bias[i];
         for (int j = 0; j < in_size; j++)
@@ -331,13 +331,13 @@ std::pair<Tensor, double> FullyConnected::backward(const Tensor& grad_output) {
     std::fill(grad_weights.begin(), grad_weights.end(), 0.0f);
     std::fill(grad_bias.begin(), grad_bias.end(), 0.0f);
 
-    #pragma omp parallel for schedule(static)
+    // #pragma omp parallel for schedule(static)
     for (int i = 0; i < out_size; i++) {
         float go = grad_output.data[i];
         grad_bias[i] += go;
         for (int j = 0; j < in_size; j++) {
             grad_weights[i * in_size + j] += input_cache.data[j] * go;
-            #pragma omp atomic
+            // #pragma omp atomic
             grad_input.data[j] += weights[i * in_size + j] * go;
         }
     }

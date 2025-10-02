@@ -6,6 +6,8 @@
 #include <vector>
 #include <iostream>
 #include <omp.h>
+#include <algorithm>  // para std::shuffle, std::iota, etc.
+#include <numeric>    // para std::iota
 
 void load_dataset_csv(const std::string& file_path,
                     std::vector<std::vector<std::vector<float>>>& images,
@@ -55,6 +57,62 @@ void load_dataset_csv(const std::string& file_path,
     }
 }
 
+void load_cifar_csv(const std::string& file_path,
+                    std::vector<std::vector<std::vector<std::vector<float>>>>& images,
+                    std::vector<int>& labels,
+                    int num_samples = -1)
+{
+    std::ifstream file(file_path);
+    if (!file.is_open())
+        throw std::runtime_error("Cannot open file: " + file_path);
+
+    images.clear();
+    labels.clear();
+
+    std::string line;
+    int count = 0;
+
+    // --- Pular cabeçalho ---
+    std::getline(file, line);
+
+    while (std::getline(file, line)) {
+        if (num_samples > 0 && count >= num_samples) break;
+
+        std::stringstream ss(line);
+        std::string value;
+        std::vector<float> pixels;
+
+        // lê todos os valores da linha
+        while (std::getline(ss, value, ',')) {
+            pixels.push_back(std::stof(value));
+        }
+
+        // if (pixels.size() != 3073)
+        //     throw std::runtime_error("CSV parsing error on line " + std::to_string(count+1) + 
+        //                              ": expected 3073 values, got " + std::to_string(pixels.size()));
+        // último valor é o label
+        int lbl = static_cast<int>(pixels.back());
+        labels.push_back(lbl);
+        pixels.pop_back(); // remove label
+
+        // reshape em [C,H,W]
+        std::vector<std::vector<std::vector<float>>> img(3,
+            std::vector<std::vector<float>>(32, std::vector<float>(32)));
+
+        int idx = 0;
+        for (int c = 0; c < 3; c++) {
+            for (int i = 0; i < 32; i++) {
+                for (int j = 0; j < 32; j++) {
+                    img[c][i][j] = pixels[idx++] / 255.0f; // normalizado
+                }
+            }
+        }
+
+        images.push_back(img);
+        count++;
+    }
+}
+
 void print_timing(){
     std::cout << "=== Timing ===\n";
     std::cout << "Conv2D forward total: " << Conv2D::total_forward_time << " ms\n";
@@ -69,22 +127,69 @@ void print_timing(){
     std::cout << "Softmax backward total: " << Softmax::total_backward_time << " ms\n";
 }
 
+void count_labels(const std::vector<int>& labels) {
+    std::vector<int> counts(10, 0);
+    for (int lbl : labels) {
+        if (lbl >= 0 && lbl < 10)
+            counts[lbl]++;
+    }
+    std::cout << "Label distribution:\n";
+    for (int i = 0; i < counts.size(); i++) {
+        std::cout << "Label " << i << ": " << counts[i] << "\n";
+    }
+}
+
+void split_dataset(
+    std::vector<std::vector<std::vector<std::vector<float>>>>& train_images,
+    std::vector<int>& train_labels,
+    std::vector<std::vector<std::vector<std::vector<float>>>>& test_images,
+    std::vector<int>& test_labels,
+    float test_ratio // ex: 0.2 = 20% para teste
+) {
+    if (train_images.size() != train_labels.size())
+        throw std::runtime_error("train_images e train_labels têm tamanhos diferentes!");
+
+    int total = train_images.size();
+    int n_test = static_cast<int>(total * test_ratio);
+
+    // índices embaralhados
+    std::vector<int> indices(total);
+    std::iota(indices.begin(), indices.end(), 0);
+
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(indices.begin(), indices.end(), g);
+
+    // pega os primeiros n_test para teste
+    for (int i = 0; i < n_test; i++) {
+        int idx = indices[i];
+        test_images.push_back(train_images[idx]);
+        test_labels.push_back(train_labels[idx]);
+    }
+
+    // cria novos vetores de treino apenas com os restantes
+    std::vector<std::vector<std::vector<std::vector<float>>>> new_train_images;
+    std::vector<int> new_train_labels;
+
+    for (int i = n_test; i < total; i++) {
+        int idx = indices[i];
+        new_train_images.push_back(train_images[idx]);
+        new_train_labels.push_back(train_labels[idx]);
+    }
+
+    // substitui os originais
+    train_images = std::move(new_train_images);
+    train_labels = std::move(new_train_labels);
+}
+
 int main() {
     int epochs = 10;
     int n_images = 20;
     srand(42); // 
-    //omp_set_num_threads(6);
+    // omp_set_num_threads(2);
 
-    // std::vector<Layer*> layers;
-    // layers.push_back(new Conv2D(1, 3, 8, 1));  // in_channels=1, out_channels=8, kernel=3, stride=1
-    // layers.push_back(new ReLU());
-    // layers.push_back(new MaxPool2x2());
-    // layers.push_back(new Flatten());
-    // layers.push_back(new FullyConnected(10)); // n_classes=10
-    // layers.push_back(new Softmax());
-
-    // std::vector<Layer*> layers;
-    // layers.push_back(new Conv2D(1, 32, 5, 1)); 
+    std::vector<Layer*> layers;
+    // layers.push_back(new Conv2D(3, 64, 3, 1));
     // layers.push_back(new ReLU());
     // layers.push_back(new MaxPool2x2());
     // layers.push_back(new Flatten());
@@ -92,37 +197,25 @@ int main() {
     // layers.push_back(new ReLU());
     // layers.push_back(new FullyConnected(10));
     // layers.push_back(new Softmax());
-/*
-    std::vector<Layer*> layers;
-    layers.push_back(new Conv2D(1, 8, 3, 1));  // 1→8 channels
+    layers.push_back(new Conv2D(3, 16, 3, 1));
     layers.push_back(new ReLU());
-    layers.push_back(new MaxPool2x2());
-    layers.push_back(new Conv2D(8, 16, 3, 1)); // 8→16 channels
+    layers.push_back(new MaxPool2x2());      // 32 -> 16
+    layers.push_back(new Conv2D(16, 32, 3, 1));
     layers.push_back(new ReLU());
-    layers.push_back(new MaxPool2x2());
-    layers.push_back(new Flatten());
-    layers.push_back(new FullyConnected(64)); // hidden layer
-    layers.push_back(new ReLU());
-    layers.push_back(new FullyConnected(10));
-    layers.push_back(new Softmax());
-*/
-    std::vector<Layer*> layers;
-    layers.push_back(new Conv2D(1, 128, 5, 1)); 
-    layers.push_back(new ReLU());
-    layers.push_back(new MaxPool2x2());
+    layers.push_back(new MaxPool2x2());      // 16 -> 8
     layers.push_back(new Flatten());
     layers.push_back(new FullyConnected(64));
     layers.push_back(new ReLU());
     layers.push_back(new FullyConnected(10));
     layers.push_back(new Softmax());
 
-    std::vector<std::vector<std::vector<float>>> train_images;
+    std::vector<std::vector<std::vector<std::vector<float>>>> train_images;
     std::vector<int> train_labels;
-    load_dataset_csv("dataset/mnist_train.csv", train_images, train_labels, 10000);
+    load_cifar_csv("dataset/cifar10_train.csv", train_images, train_labels, 10000);
 
-    std::vector<std::vector<std::vector<float>>> test_images;
+    std::vector<std::vector<std::vector<std::vector<float>>>> test_images;
     std::vector<int> test_labels;
-    load_dataset_csv("dataset/mnist_test.csv", test_images, test_labels, 2000);
+    split_dataset(train_images, train_labels, test_images, test_labels, 0.2f);
 
     for (int e = 0; e < epochs; e++){
         std::cout << "Epoch " << e+1 << "\n";
@@ -140,40 +233,6 @@ int main() {
                   << ", Predicted = " << pred_lbl
                   << (pred_lbl == true_lbl ? " ✅" : " ❌") << "\n";
     }
-
-    exit(0);
-
-    
-
-    // // Treino
-    // int epochs = 100;
-    // float lr = 0.01f;
-
-    // for (int e = 0; e < epochs; e++) {
-    //     train_epoch(conv1, relu1, pool1, fc1, softmax, train_images, train_labels, lr); 
-    //     float acc = evaluate(conv1, relu1, pool1, fc1, softmax, test_images, test_labels); 
-    // }
-
-    // for (int i = 0; i < 10; i++) {
-    //     int idx = rand() % test_images.size();
-    //     int true_lbl = test_labels[idx];
-    //     int pred_lbl = predict(conv1, relu1, pool1, fc1, softmax, test_images[idx]);
-    //     std::cout << "Random Test Image [" << idx << "]: True Label = " << true_lbl
-    //               << ", Predicted = " << pred_lbl
-    //               << (pred_lbl == true_lbl ? " ✅" : " ❌") << "\n";
-    // }
-
-    // std::cout << "=== Timing ===\n";
-    // std::cout << "Conv2D forward total: " << Conv2D::total_forward_time << " ms\n";
-    // std::cout << "Conv2D backward total: " << Conv2D::total_backward_time << " ms\n";
-    // std::cout << "ReLU forward total: " << ReLU::total_forward_time << " ms\n";
-    // std::cout << "ReLU backward total: " << ReLU::total_backward_time << " ms\n";
-    // std::cout << "MaxPool2x2 forward total: " << MaxPool2x2::total_forward_time << " ms\n";
-    // std::cout << "MaxPool2x2 backward total: " << MaxPool2x2::total_backward_time << " ms\n";
-    // std::cout << "FullyConnected forward total: " << FullyConnected::total_forward_time << " ms\n";
-    // std::cout << "FullyConnected backward total: " << FullyConnected::total_backward_time << " ms\n";
-    // std::cout << "Softmax forward total: " << Softmax::total_forward_time << " ms\n";
-    // std::cout << "Softmax backward total: " << Softmax::total_backward_time << " ms\n";
 
     return 0;
 }
