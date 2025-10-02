@@ -41,24 +41,32 @@ std::pair<Tensor, double> Conv2D::forward(const Tensor& input) {
     Tensor out(std::vector<float>(out_channels * out_H * out_W, 0.0f),
                {out_channels, out_H, out_W});
 
-    // OTIMIZAÇÃO: Paraleliza os loops sobre os canais de saída e as dimensões espaciais.
-    // O cálculo de cada ponto de saída é uma operação independente.
-    #pragma omp parallel for collapse(3) schedule(dynamic)
+    const float* input_data = input.data.data();
+    const float* weights_data = weights.data();
+    float* out_data = out.data.data();
+
+    // MUDANÇA: Usando schedule(static) para overhead menor.
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int oc = 0; oc < out_channels; oc++) {
         for (int i = 0; i < out_H; i++) {
             for (int j = 0; j < out_W; j++) {
                 float sum = bias[oc];
+                
+                // OTIMIZAÇÃO: Loop sobre os canais de entrada
                 for (int ic = 0; ic < in_channels; ic++) {
+                    // OTIMIZAÇÃO: Pré-calcula ponteiros para reduzir o cálculo de índice repetido
+                    const float* p_input = input_data + (ic * H * W) + (i * stride * W) + (j * stride);
+                    const float* p_weights = weights_data + (oc * in_channels + ic) * kernel_size * kernel_size;
+
+                    // O loop mais interno é um produto escalar, ideal para vetorização (SIMD)
                     for (int ki = 0; ki < kernel_size; ki++) {
                         for (int kj = 0; kj < kernel_size; kj++) {
-                            int xi = i * stride + ki;
-                            int xj = j * stride + kj;
-                            float w = weights[ ((oc*in_channels+ic)*kernel_size+ki)*kernel_size + kj ];
-                            sum += input.at(ic, xi, xj) * w;
+                            sum += p_input[ki * W + kj] * p_weights[ki * kernel_size + kj];
                         }
                     }
                 }
-                out.at(oc, i, j) = sum;
+                // OTIMIZAÇÃO: Acesso direto à memória de saída
+                out_data[(oc * out_H * out_W) + (i * out_W) + j] = sum;
             }
         }
     }
@@ -331,13 +339,11 @@ std::pair<Tensor, double> FullyConnected::backward(const Tensor& grad_output) {
     std::fill(grad_weights.begin(), grad_weights.end(), 0.0f);
     std::fill(grad_bias.begin(), grad_bias.end(), 0.0f);
 
-    #pragma omp parallel for schedule(static)
     for (int i = 0; i < out_size; i++) {
         float go = grad_output.data[i];
         grad_bias[i] += go;
         for (int j = 0; j < in_size; j++) {
             grad_weights[i * in_size + j] += input_cache.data[j] * go;
-            #pragma omp atomic
             grad_input.data[j] += weights[i * in_size + j] * go;
         }
     }
