@@ -101,13 +101,14 @@ std::pair<Tensor, double> Conv2D::backward(const Tensor& grad_output) {
     std::vector<std::vector<float>> priv_grad_bias(nthreads, std::vector<float>(grad_bias.size(), 0.0f));
     std::vector<std::vector<float>> priv_grad_input(nthreads, std::vector<float>(grad_input.data.size(), 0.0f));
 
-    #pragma omp parallel for collapse(3) schedule(dynamic)
+    #pragma omp parallel for collapse(2) schedule(static)
     for (int oc = 0; oc < out_channels; oc++) {
         for (int i = 0; i < out_H; i++) {
             for (int j = 0; j < out_W; j++) {
                 int tid = omp_get_thread_num();
                 float go = grad_output.at(oc, i, j);
                 priv_grad_bias[tid][oc] += go;
+                #pragma omp simd
                 for (int ic = 0; ic < in_channels; ic++) {
                     for (int ki = 0; ki < kernel_size; ki++) {
                         for (int kj = 0; kj < kernel_size; kj++) {

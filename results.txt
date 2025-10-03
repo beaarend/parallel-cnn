@@ -1,0 +1,251 @@
+THREADS=1
+Epoch 1
+Train Loss: 0.31594 | Acc: 0.9037
+Total Forward Time (ms): 19014.9
+Total Backward Time (ms): 39345.7
+Eval Acc: 0.9555
+Epoch 2
+Train Loss: 0.102801 | Acc: 0.969
+Total Forward Time (ms): 18702.7
+Total Backward Time (ms): 38809
+Eval Acc: 0.9565
+Epoch 3
+Train Loss: 0.0556643 | Acc: 0.9826
+Total Forward Time (ms): 18100.8
+Total Backward Time (ms): 37842.5
+Eval Acc: 0.967
+Epoch 4
+Train Loss: 0.0303143 | Acc: 0.9907
+Total Forward Time (ms): 18251.9
+Total Backward Time (ms): 38207.3
+Eval Acc: 0.9665
+Epoch 5
+Train Loss: 0.0172996 | Acc: 0.9949
+Total Forward Time (ms): 18396.3
+Total Backward Time (ms): 38455.3
+Eval Acc: 0.968
+Epoch 6
+Train Loss: 0.0165841 | Acc: 0.9945
+Total Forward Time (ms): 18225.7
+Total Backward Time (ms): 38181.3
+Eval Acc: 0.9595
+Epoch 7
+Train Loss: 0.00751313 | Acc: 0.9977
+Total Forward Time (ms): 18488
+Total Backward Time (ms): 38881.8
+Eval Acc: 0.9685
+Epoch 8
+Train Loss: 0.00547301 | Acc: 0.9987
+Total Forward Time (ms): 18266.7
+Total Backward Time (ms): 38479.4
+Eval Acc: 0.9735
+Epoch 9
+Train Loss: 0.00214964 | Acc: 0.9994
+Total Forward Time (ms): 18509.9
+Total Backward Time (ms): 38703.6
+Eval Acc: 0.974
+Epoch 10
+Train Loss: 0.000769069 | Acc: 1
+Total Forward Time (ms): 18228.6
+Total Backward Time (ms): 38093.8
+Eval Acc: 0.974
+=== Timing ===
+Conv2D forward total: 113877 ms
+Conv2D backward total: 237132 ms
+ReLU forward total: 11534.3 ms
+ReLU backward total: 4458.82 ms
+MaxPool2x2 forward total: 15159.5 ms
+MaxPool2x2 backward total: 18707.4 ms
+FullyConnected forward total: 78952.2 ms
+FullyConnected backward total: 124701 ms
+Softmax forward total: 168.413 ms
+Softmax backward total: 0 ms
+
+THREADS=2
+Epoch 1
+Train Loss: 0.327593 | Acc: 0.8988
+Total Forward Time (ms): 10662.9
+Total Backward Time (ms): 37780.6
+Eval Acc: 0.951
+Epoch 2
+Train Loss: 0.108951 | Acc: 0.9682
+Total Forward Time (ms): 9993.02
+Total Backward Time (ms): 36480.9
+Eval Acc: 0.953
+Epoch 3
+Train Loss: 0.0545118 | Acc: 0.984
+Total Forward Time (ms): 10244.7
+Total Backward Time (ms): 37318.3
+Eval Acc: 0.959
+Epoch 4
+Train Loss: 0.0319572 | Acc: 0.99
+Total Forward Time (ms): 10646.2
+Total Backward Time (ms): 38035.7
+Eval Acc: 0.9645
+Epoch 5
+Train Loss: 0.0211414 | Acc: 0.9932
+Total Forward Time (ms): 10371.7
+Total Backward Time (ms): 37502.3
+Eval Acc: 0.9635
+Epoch 6
+Train Loss: 0.0137891 | Acc: 0.996
+Total Forward Time (ms): 10459.8
+Total Backward Time (ms): 37637.3
+Eval Acc: 0.9685
+Epoch 7
+Train Loss: 0.00907626 | Acc: 0.9971
+Total Forward Time (ms): 10163.4
+Total Backward Time (ms): 36657.8
+Eval Acc: 0.9705
+Epoch 8
+Train Loss: 0.0120648 | Acc: 0.9964
+Total Forward Time (ms): 10452.6
+Total Backward Time (ms): 37941.1
+Eval Acc: 0.9665
+Epoch 9
+Train Loss: 0.00799685 | Acc: 0.9972
+Total Forward Time (ms): 10829.1
+Total Backward Time (ms): 39394.6
+Eval Acc: 0.974
+Epoch 10
+Train Loss: 0.00202737 | Acc: 0.9997
+Total Forward Time (ms): 10671.6
+Total Backward Time (ms): 38638.8
+Eval Acc: 0.9755
+=== Timing ===
+Conv2D forward total: 64155.4 ms
+Conv2D backward total: 240144 ms
+ReLU forward total: 7926.75 ms
+ReLU backward total: 3185.7 ms
+MaxPool2x2 forward total: 9899.57 ms
+MaxPool2x2 backward total: 18090.6 ms
+FullyConnected forward total: 42293 ms
+FullyConnected backward total: 115967 ms
+Softmax forward total: 162.095 ms
+Softmax backward total: 0 ms
+
+THREADS=4
+Epoch 1
+Train Loss: 0.326247 | Acc: 0.8973
+Total Forward Time (ms): 7128.66
+Total Backward Time (ms): 35913.8
+Eval Acc: 0.9545
+Epoch 2
+Train Loss: 0.103034 | Acc: 0.9697
+Total Forward Time (ms): 6405.79
+Total Backward Time (ms): 35707.3
+Eval Acc: 0.9625
+Epoch 3
+Train Loss: 0.0593196 | Acc: 0.9824
+Total Forward Time (ms): 6322
+Total Backward Time (ms): 36410.5
+Eval Acc: 0.965
+Epoch 4
+Train Loss: 0.0318302 | Acc: 0.9893
+Total Forward Time (ms): 6299.65
+Total Backward Time (ms): 36076.7
+Eval Acc: 0.968
+Epoch 5
+Train Loss: 0.0229596 | Acc: 0.9927
+Total Forward Time (ms): 6309.89
+Total Backward Time (ms): 36388.4
+Eval Acc: 0.964
+Epoch 6
+Train Loss: 0.0122488 | Acc: 0.9963
+Total Forward Time (ms): 6522.91
+Total Backward Time (ms): 36391.2
+Eval Acc: 0.9685
+Epoch 7
+Train Loss: 0.00877799 | Acc: 0.9977
+Total Forward Time (ms): 6426.66
+Total Backward Time (ms): 36399.3
+Eval Acc: 0.9705
+Epoch 8
+Train Loss: 0.00552002 | Acc: 0.9984
+Total Forward Time (ms): 6310
+Total Backward Time (ms): 36338.8
+Eval Acc: 0.973
+Epoch 9
+Train Loss: 0.00138453 | Acc: 0.9999
+Total Forward Time (ms): 6458.05
+Total Backward Time (ms): 36291.5
+Eval Acc: 0.973
+Epoch 10
+Train Loss: 0.000988617 | Acc: 0.9997
+Total Forward Time (ms): 6427.78
+Total Backward Time (ms): 36103
+Eval Acc: 0.9745
+=== Timing ===
+Conv2D forward total: 40426.2 ms
+Conv2D backward total: 233652 ms
+ReLU forward total: 5386.97 ms
+ReLU backward total: 2456.83 ms
+MaxPool2x2 forward total: 7748.74 ms
+MaxPool2x2 backward total: 17593.5 ms
+FullyConnected forward total: 23164.6 ms
+FullyConnected backward total: 108319 ms
+Softmax forward total: 152.257 ms
+Softmax backward total: 0 ms
+
+THREADS=8
+Epoch 1
+Train Loss: 0.313398 | Acc: 0.9029
+Total Forward Time (ms): 5553.86
+Total Backward Time (ms): 32991.2
+Eval Acc: 0.945
+Epoch 2
+Train Loss: 0.101298 | Acc: 0.9688
+Total Forward Time (ms): 5696.28
+Total Backward Time (ms): 35721.1
+Eval Acc: 0.959
+Epoch 3
+Train Loss: 0.0499837 | Acc: 0.9835
+Total Forward Time (ms): 6184.53
+Total Backward Time (ms): 37655.7
+Eval Acc: 0.9645
+Epoch 4
+Train Loss: 0.0344079 | Acc: 0.9891
+Total Forward Time (ms): 6123.47
+Total Backward Time (ms): 37075.5
+Eval Acc: 0.9655
+Epoch 5
+Train Loss: 0.0189112 | Acc: 0.9942
+Total Forward Time (ms): 5806.7
+Total Backward Time (ms): 36361.6
+Eval Acc: 0.971
+Epoch 6
+Train Loss: 0.0118553 | Acc: 0.9958
+Total Forward Time (ms): 5710.94
+Total Backward Time (ms): 36222.9
+Eval Acc: 0.97
+Epoch 7
+Train Loss: 0.00483967 | Acc: 0.9987
+Total Forward Time (ms): 5798.06
+Total Backward Time (ms): 36360.3
+Eval Acc: 0.9715
+Epoch 8
+Train Loss: 0.0088068 | Acc: 0.9973
+Total Forward Time (ms): 6386.93
+Total Backward Time (ms): 37423.6
+Eval Acc: 0.962
+Epoch 9
+Train Loss: 0.00603197 | Acc: 0.9978
+Total Forward Time (ms): 7563.19
+Total Backward Time (ms): 41008.5
+Eval Acc: 0.9725
+Epoch 10
+Train Loss: 0.00148159 | Acc: 0.9999
+Total Forward Time (ms): 8093.97
+Total Backward Time (ms): 41559
+Eval Acc: 0.9765
+=== Timing ===
+Conv2D forward total: 34014.9 ms
+Conv2D backward total: 201894 ms
+ReLU forward total: 7018.84 ms
+ReLU backward total: 3785.84 ms
+MaxPool2x2 forward total: 7558.76 ms
+MaxPool2x2 backward total: 23488.7 ms
+FullyConnected forward total: 25136.2 ms
+FullyConnected backward total: 143211 ms
+Softmax forward total: 192.045 ms
+Softmax backward total: 0 ms
